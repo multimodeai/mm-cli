@@ -436,127 +436,147 @@ scenarios:
 
 | Out of Scope | Why |
 |---|---|
-| Web UI / dashboard | CLI-first. Web is Phase D / Enterprise. |
+| Web UI / dashboard | Dashboards are a dying paradigm. Agents don't need them. |
 | promptfoo integration | Custom engine only, decision made |
 | OpenAI / Gemini model support | Claude only for v1 |
 | Resume interrupted interviews | Too complex for v1. Ctrl-C = restart |
 | VS Code extension | Future. StdinIO abstraction enables it later |
 | Auto-generate SKILL.md from codebase | Unbounded. `mm skill new` scaffolds; human fills |
-| Cloud sync / team features | Local-first. Git is the sync mechanism. Enterprise feature. |
-| Custom interview questions | Templates are fixed for v1. Enterprise customizable. |
-| CI integration | Manual `mm eval run`. Enterprise gets pipeline gates. |
+| Cloud sync / team features | Local-first. Git is the sync mechanism. |
+| Custom interview questions | Templates are fixed for v1. |
+| CI integration | Manual `mm eval run`. API tier gets pipeline gates. |
 | Internationalization | English only |
 
 ---
 
-## Commercialization — Open Source + Enterprise Tiers
+## Commercialization — Open Source + Agent Infrastructure
+
+### The Shift: B2B → B2A
+
+Software is moving from Business-to-Business (sold to humans through UIs) to Business-to-Agent (consumed by agents through APIs). When agents mediate all software interaction, UI moats collapse, switching costs go to zero, and SaaS pricing compresses toward utility economics.
+
+mm is positioned for this shift. It's not a dashboard — it's **agent infrastructure**. The outputs (SPEC.md, INTENT.md, CLAUDE.md, eval scores) are artifacts that agents consume to work better. The interview engine is the human input mechanism; the structured artifacts are the agent-consumable output.
 
 ### Positioning
 
-`mm` is a **developer productivity tool that turns prompting from a guessing game into an engineering discipline**. It operationalizes the 4 disciplines framework (Prompt Craft -> Context -> Intent -> Specification) with measurable eval outcomes.
+`mm` is **infrastructure that makes AI agents better at their jobs**. It operationalizes the 4 disciplines (Prompt Craft → Context → Intent → Specification) and measures whether the context engineering actually improves output.
 
-The pitch: skills + evals = **measurably better AI output**, tracked over time. Not "better prompts" — quantifiable improvement.
+The pitch: "You're deploying agents. Are you measuring whether they're getting better? mm produces the artifacts agents need (specs, intent docs, context files) and the evals that prove they work."
 
 ### Open Source (mm CLI) — Free Forever
 
-Everything in Sessions 1-5. The full 16-command CLI:
+The full 16-command CLI. AGPL-3.0 licensed.
 
 | Feature | Status |
 |---|---|
 | All 16 commands (preflight through skill export) | Included |
 | Local skill management (.claude/skills/) | Included |
-| All 10 prompt interviews | Included |
+| All 10 interview templates | Included |
 | Custom eval engine with A/B testing | Included |
-| Multi-Axis 5-dim scoring | Included |
+| Multi-axis 5-dim scoring | Included |
 | Multi-IDE export (Cursor, Windsurf) | Included |
 | CLAUDE.md / SPEC.md / INTENT.md generation | Included |
 | Single user, local files, git-controlled | Included |
 | Claude API only (BYOK — bring your own key) | Included |
 
-**License:** MIT or Apache 2.0. The CLI is the funnel. The methodology is the moat.
+**License:** AGPL-3.0. Free to use, modify, and distribute. If you wrap mm's methodology in a hosted service, you must open-source the wrapper. Protects the methodology while keeping the CLI fully open.
 
-### mm Pro — Individual Power Users ($19-29/mo)
+### mm API — Usage-Based ($0.01-0.05/call)
 
-| Feature | What it does |
-|---|---|
-| **Multi-model eval** | Run evals across Claude, GPT-4, Gemini, open-source models. Compare which model + skill combo works best for YOUR tasks |
-| **Eval history + trends** | Local SQLite DB tracking eval scores over time. `mm eval history <skill>` shows regression/improvement graphs in terminal |
-| **Skill templates library** | Curated starter SKILL.md templates for common domains (React, Supabase, Terraform, etc.) — `mm skill install react` |
-| **Interview resume** | Save and resume interrupted interviews. Pick up `mm spec new` where you left off |
-| **Custom interview templates** | Modify prompt templates or create your own for domain-specific interviews |
-| **Priority support** | Discord channel + email support |
-
-**Revenue model:** Subscription via Stripe. License key unlocks Pro features in the CLI.
-
-### mm Enterprise — Teams & Organizations ($49-99/seat/mo)
+mm as a headless service. Agents call mm's methodology through an API, not a CLI.
 
 | Feature | What it does |
 |---|---|
-| **Team skill registry** | Central registry of approved skills. `mm skill push` / `mm skill pull`. Version-controlled with review workflows |
-| **Shared eval suites** | Team-wide eval baselines. When one person improves a skill, everyone benefits. Regression alerts across the team |
-| **Eval dashboard (web)** | Web UI showing skill performance across the org. Heatmaps of which skills improve which tasks |
+| **Eval API** | `POST /eval/run` — submit eval suite, get scored results back as JSON. Agents run evals programmatically |
+| **Interview API** | `POST /interview/start` — run any interview template headlessly. Agent provides answers, gets structured artifact back |
+| **Skill Registry API** | `GET/POST /skills` — push, pull, and discover skills across projects. API-first, no UI |
+| **Multi-model eval** | Run evals across Claude, GPT-4, Gemini, open-source models. Compare which model + skill combo works best |
+| **Eval history** | `GET /eval/history/<skill>` — trend data over time. Agents track regression/improvement programmatically |
+| **Artifact generation** | `POST /generate/spec` — generate SPEC.md, INTENT.md, constraints from structured input. No interview needed |
+
+**Revenue model:** Usage-based via Stripe. Pay per API call. Like Twilio for agent methodology.
+
+| Tier | Rate | Includes |
+|---|---|---|
+| Free | 50 calls/month | Eval runs, artifact generation |
+| Growth | $0.02/call | Unlimited, multi-model, history |
+| Scale | $0.01/call + volume discount | Priority, SLA, dedicated support |
+
+### mm Enterprise — Agent Infrastructure for Teams
+
+Not a dashboard. An API + registry that agents across your org consume.
+
+| Feature | What it does |
+|---|---|
+| **Team skill registry (API)** | Central registry of approved skills. `mm skill push` / `mm skill pull`. Version-controlled, API-accessible |
+| **Shared eval baselines** | Team-wide eval baselines. When one agent's skill improves, every agent benefits. Regression alerts via webhook |
 | **CI/CD eval gates** | GitHub Action / GitLab CI integration. PRs that modify SKILL.md must pass eval thresholds before merge |
 | **Multi-model support** | Run evals against any OpenAI-compatible API (Azure, Bedrock, self-hosted). Critical for sovereign/air-gapped deployments |
-| **SSO + RBAC** | SAML/OIDC authentication. Role-based access to skills and eval results. Audit trail for compliance |
-| **Custom interview frameworks** | Organization-specific interview templates. Encode your company's definition of "good code" into the eval system |
-| **Compliance reporting** | Export eval results as PDF/CSV for audit. Track which AI models + skills are approved for which use cases |
-| **Self-hosted option** | On-prem registry server for air-gapped environments. Docker compose deployment |
-| **Onboarding automation** | New developer joins → `mm init --team` pulls team skills, context docs, eval baselines automatically |
+| **MCP server mode** | Run mm as an MCP server. Any MCP-compatible agent can call mm's methodology as tools |
+| **Scoped API tokens** | Machine-to-machine auth for agents. Scoped access per project, per skill, per eval suite. Audit trail |
+| **Custom interview frameworks** | Organization-specific templates. Encode your company's definition of "good code" into the eval system |
+| **Compliance artifacts** | Export eval results as structured JSON/CSV for audit. Track which models + skills are approved for which use cases |
+| **Self-hosted option** | On-prem deployment for air-gapped environments. Docker compose. Your agents, your infrastructure |
+| **Webhook integrations** | Eval results → Slack, PagerDuty, custom endpoints. Agent-to-agent notification, not human dashboards |
+
+**Revenue model:** Usage-based + platform fee. $500/mo base + $0.01/call. Volume discounts at scale.
 
 ### Go-to-Market Strategy
 
 **Phase 1 — Open Source Traction (Months 1-3)**
-- Ship v1.0 CLI on npm + GitHub
-- Write launch post connecting the 4 disciplines framework + benchmarks + the tool
-- Target: dev tool communities (Hacker News, r/programming, Twitter/X dev circles)
+- Ship v1.0 CLI on npm + GitHub (AGPL-3.0)
+- Write launch post: "The 4 disciplines framework — why prompting split into 4 skills and how to measure each one"
+- Target: dev tool communities (Hacker News, r/programming, Twitter/X)
 - Metric: 1,000 GitHub stars, 500 npm weekly downloads
 
-**Phase 2 — Pro Launch (Months 3-6)**
-- Add Pro features (multi-model, history, templates)
-- Publish case studies: "How I improved my AI output by X% using mm evals"
-- Partner with AI educators / course creators who teach prompting
-- Metric: 100 Pro subscribers, $2-3K MRR
+**Phase 2 — API Launch (Months 3-6)**
+- Ship mm API — headless eval runs, artifact generation, skill registry
+- Usage-based pricing via Stripe
+- Publish case studies: "How we improved agent output by X% using mm evals"
+- Target: teams building agent workflows (Claude Code, Cursor, custom agents)
+- Metric: 100 API customers, $3-5K MRR
 
-**Phase 3 — Enterprise Pilot (Months 6-12)**
-- Target: engineering teams at companies deploying AI coding assistants
-- Pitch: "You're paying for Copilot/Cursor seats. Are you measuring whether your team is actually getting better at using them?"
-- Land 3-5 pilot customers (10-50 seat deployments)
-- Build the dashboard, CI integration, SSO based on pilot feedback
-- Metric: 3 enterprise customers, $15-30K MRR
+**Phase 3 — Enterprise / MCP (Months 6-12)**
+- Ship MCP server mode — any MCP-compatible agent can use mm as a tool
+- Team skill registry + CI eval gates
+- Target: engineering orgs deploying AI agents at scale
+- Pitch: "Your agents are only as good as their context. mm measures and improves it."
+- Land 3-5 enterprise customers
+- Metric: $20-40K MRR
 
-**Phase 4 — Scale (Year 2)**
-- Marketplace for community-contributed skill templates
-- Integration partnerships (GitHub, VS Code, JetBrains)
-- Enterprise self-hosted for regulated industries (finance, healthcare, government)
-- SOC 2 compliance for hosted version
-- Target: $100K+ MRR
+**Phase 4 — Agent Infrastructure Standard (Year 2)**
+- mm becomes the eval/methodology layer in agent stacks
+- Marketplace for community-contributed skill templates (API-accessible)
+- Integration partnerships: Anthropic MCP ecosystem, LangChain, CrewAI
+- Self-hosted enterprise for regulated industries + sovereign deployments
+- Target: $150K+ MRR
 
 ### Competitive Landscape
 
 | Competitor | What they do | Why mm is different |
 |---|---|---|
-| promptfoo | Generic LLM eval framework | mm is skill-aware: A/B tests WITH vs WITHOUT context engineering |
-| Cursor / Windsurf rules | IDE-specific context files | mm is IDE-agnostic. Write once, export everywhere. Plus evals |
-| Anthropic's CLAUDE.md | One big context file | mm adds structure (skills), measurement (evals), and the 4 disciplines |
-| Langsmith / Braintrust | LLM observability / eval platforms | Enterprise-heavy, hosted, expensive. mm starts local + CLI |
-| Custom internal tools | Companies building their own | mm provides the methodology + the tooling |
+| promptfoo | Generic LLM eval framework | mm is skill-aware: A/B tests WITH vs WITHOUT context engineering. Not just "is output good" but "does context make it better" |
+| Cursor / Windsurf rules | IDE-specific context files | mm is IDE-agnostic + agent-agnostic. Write once, any agent consumes. Plus evals — they have no measurement |
+| Anthropic's CLAUDE.md | One big context file | mm adds structure (skills), measurement (evals), and the 4 disciplines. CLAUDE.md is just discipline 2 of 4 |
+| Langsmith / Braintrust | LLM observability / eval platforms | UI-heavy, dashboard-first. mm is API-first, agent-native. Bottom-up adoption via CLI |
+| Custom internal tools | Companies building their own | mm provides the methodology + the tooling. Build vs buy — most teams won't build a calibrated interview + eval framework |
 
 ### Sovereign / Government Angle
 
-- **Air-gapped mm Enterprise**: Self-hosted skill registry + eval engine for government deployments
-- **Sovereign model eval**: Run `mm eval` against self-hosted models (vLLM, SGLang) to validate domestic models meet quality thresholds
+- **Air-gapped mm Enterprise**: Self-hosted skill registry + eval API for government deployments
+- **Sovereign model eval**: Run `mm eval` against self-hosted models (vLLM, SGLang) to validate domestic models meet quality thresholds before deployment
 - **Compliance artifact generation**: `mm spec new` + `mm constraint` produce audit-ready documentation for AI governance frameworks
-- **Skills as policy**: Government agencies distribute approved AI interaction patterns via team skill registry
-- **The sovereign pitch**: "We're not just deploying sovereign AI — we're measuring whether it works, with a rigorous eval methodology that produces measurable improvement"
+- **Skills as policy**: Government agencies distribute approved AI interaction patterns via team skill registry API — standardize how agents interact with classified/sensitive systems
+- **Agent infrastructure for sovereign AI**: "You're deploying sovereign models. mm measures whether they actually work, with the same eval methodology that produces measurable improvement"
 
 ### Revenue Projection (Conservative)
 
-| Month | OSS Downloads | Pro Subs | Enterprise Seats | MRR |
+| Month | OSS Downloads | API Customers | Enterprise | MRR |
 |---|---|---|---|---|
-| 3 | 500/wk | 20 | 0 | $500 |
-| 6 | 2,000/wk | 100 | 30 | $4,500 |
-| 12 | 5,000/wk | 300 | 150 | $22,000 |
-| 18 | 10,000/wk | 500 | 500 | $62,000 |
-| 24 | 20,000/wk | 800 | 1,000 | $120,000 |
+| 3 | 500/wk | 30 | 0 | $1,500 |
+| 6 | 2,000/wk | 150 | 2 | $8,000 |
+| 12 | 5,000/wk | 500 | 8 | $35,000 |
+| 18 | 10,000/wk | 1,200 | 20 | $80,000 |
+| 24 | 20,000/wk | 3,000 | 40 | $170,000 |
 
-Assumptions: Pro at $25/mo avg, Enterprise at $75/seat/mo avg. Churn: 5% monthly Pro, 2% monthly Enterprise.
+Assumptions: API avg $15/mo (usage-based), Enterprise avg $1,500/mo (base + usage). Churn: 8% monthly API (utility), 2% monthly Enterprise.

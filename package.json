@@ -20,7 +20,7 @@
     "claude",
     "prompt-engineering"
   ],
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "engines": {
     "node": ">=18"
   },

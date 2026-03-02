@@ -135,4 +135,4 @@ Skills + evals = measurable improvement in AI output quality.
 
 ## License
 
-MIT
+AGPL-3.0 — Free to use, modify, and distribute. If you build a hosted service on mm's methodology, you must open-source the service code. See [LICENSE](LICENSE) for details.
