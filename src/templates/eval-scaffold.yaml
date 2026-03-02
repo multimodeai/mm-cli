@@ -1,0 +1,19 @@
+name: {{NAME}}-eval
+skill: .claude/skills/{{NAME}}/SKILL.md
+model: claude-sonnet-4-20250514
+judge: claude-sonnet-4-20250514
+
+scenarios:
+  - name: basic-usage
+    prompt: |
+      # TODO: Describe a task this skill should handle well
+    context: |
+      # TODO: Add relevant context
+    expected_qualities:
+      - # TODO: What a good response looks like
+    failure_modes:
+      - # TODO: What a bad response looks like
+    scoring:
+      excellent: 5
+      acceptable: 3
+      poor: 1

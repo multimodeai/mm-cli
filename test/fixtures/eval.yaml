@@ -1,0 +1,49 @@
+name: sample-skill-eval
+skill: .claude/skills/sample-skill/SKILL.md
+model: claude-sonnet-4-20250514
+judge: claude-sonnet-4-20250514
+
+scenarios:
+  - name: basic-task
+    prompt: |
+      Write a function that validates an email address.
+    context: |
+      TypeScript, strict mode, no external libraries.
+    expected_qualities:
+      - Uses regex or string parsing for validation
+      - Handles edge cases (empty string, missing @)
+      - Returns boolean
+    failure_modes:
+      - Uses external library
+      - Only checks for @ symbol
+    scoring:
+      excellent: 5
+      acceptable: 3
+      poor: 1
+
+  - name: constraint-shift
+    base_scenario: basic-task
+    prompt: |
+      Write a function that validates an email address.
+    context: |
+      TypeScript, strict mode, no external libraries.
+    constraint_change: |
+      Also validate that the domain has a valid MX record.
+      This must work in a Node.js environment.
+    expected_qualities:
+      - Uses DNS lookup for MX validation
+      - Handles network errors gracefully
+      - Async function signature
+    failure_modes:
+      - Ignores the MX requirement
+      - No error handling
+    manifold_dimensions:
+      selective_transfer: "Original regex validation should remain, MX check added on top"
+      causal_transparency: "Should explain why MX lookup is needed beyond syntax check"
+      creative_rerouting: "Should use dns.resolveMx or similar built-in"
+      degradation_awareness: "Should note MX lookup adds network dependency and latency"
+      output_coherence: "Must still validate syntax AND check MX records"
+    scoring:
+      excellent: 5
+      acceptable: 3
+      poor: 1

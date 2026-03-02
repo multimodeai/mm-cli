@@ -1,0 +1,8 @@
+{
+  "name": "{{NAME}}",
+  "version": "1.0.0",
+  "description": "",
+  "triggers": ["{{NAME}}"],
+  "skill_file": "SKILL.md",
+  "eval_suite": null
+}
