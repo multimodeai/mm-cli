@@ -341,47 +341,55 @@ DOMAIN 7 — AI INTERACTION PATTERNS
 
 After completing all seven domains, produce the context document.
 
-FORMAT THE OUTPUT AS:
+FORMAT THE OUTPUT AS A SKILL FILE with YAML frontmatter:
 
-=== PERSONAL CONTEXT DOCUMENT ===
-Last updated: [today's date]
+---
+name: business-context
+version: 1.0.0
+triggers:
+  - strategy
+  - milestone
+  - deliverable
+  - goals
+  - priorities
+  - planning
+---
 
-ROLE & FUNCTION
-[Structured summary]
+# Business Context Skill
 
-CURRENT PRIORITIES
-[Ranked list with brief context for each]
+## Role
+[Their role, organization, what they do — from Domain 1]
 
-AUDIENCES
-[Who they serve, what each audience cares about]
+## Instructions
+[Synthesized guidance — priorities, quality bars, audience-specific communication rules — from Domains 2-4]
+[What "excellent work" looks like, how performance is measured]
+[AI interaction patterns — what works, what doesn't, preferred task types — from Domain 7]
 
-QUALITY STANDARDS
-[Specific, concrete quality criteria — not platitudes]
+## Context
+[Institutional knowledge — unwritten rules, special terminology, stakeholder map — from Domain 5]
+[Key stakeholders and what each cares about]
+[Current priorities ranked with brief context — from Domain 2]
 
-COMMUNICATION STYLE
-[Tone, format preferences, words to use/avoid]
+## Output Format
+[Their preferred formats per audience/task type — from Domain 4]
+[Tone, style, words to use/avoid]
 
-INSTITUTIONAL CONTEXT
-[Unwritten rules, special terminology, stakeholder map]
+## Guardrails
+[Constraints, boundaries, things to never do, sensitivities — from Domain 6]
+[Hard limits, approval requirements, political sensitivities]
+[WHEN IN DOUBT: 3-5 decision rules that capture their judgment — derived from the interview]
 
-CONSTRAINTS & BOUNDARIES
-[Hard limits, sensitivities, approval requirements]
+## Self-Improvement
+<!-- After eval results: what patterns scored well? What needs adjustment? -->
 
-AI INTERACTION NOTES
-[What works, what doesn't, preferred task types]
-
-WHEN IN DOUBT
-[3-5 decision rules that capture their judgment — derived from the interview]
-
-After the document, provide:
-1. "COMPLETENESS CHECK: These sections are solid: [list]. These sections need more detail when you have time: [list with specific suggestions for what to add]."
-2. "HOW TO USE THIS: Paste this document at the start of any AI session. For [their most common AI task], you'll notice [specific expected improvement]. Update this document monthly or whenever your priorities shift."
+After the skill file, provide:
+"COMPLETENESS CHECK: These sections are solid: [list]. These sections need more detail when you have time: [list with specific suggestions for what to add]."
 </instructions>
 
 <output>
-A single, copy-paste-ready context document formatted as clean structured text. Should be 500-1,000 words — long enough to be comprehensive, short enough that it doesn't waste context window space on low-signal content.
+A single, copy-paste-ready SKILL.md file with YAML frontmatter and ## sections (Role, Instructions, Context, Output Format, Guardrails, Self-Improvement). Should be 500-1,000 words — long enough to be comprehensive, short enough that it doesn't waste context window space on low-signal content.
 
-Followed by a completeness check and usage instructions.
+Followed by a completeness check.
 </output>`,
   phases: [
     { name: 'Role & Function', instructions: 'Domain 1 questions' },
@@ -392,16 +400,16 @@ Followed by a completeness check and usage instructions.
     { name: 'Constraints & Boundaries', instructions: 'Domain 6 questions' },
     { name: 'AI Interaction Patterns', instructions: 'Domain 7 questions' },
   ],
-  artifactTemplate: 'Personal Context Document (CLAUDE.md)',
+  artifactTemplate: 'Business Context Skill (SKILL.md)',
   guardrails: [
     '- Include ONLY information the user actually provided — do not fill gaps with plausible-sounding content',
     '- If a section has insufficient information, include it with a "[TO FILL: ...]" note rather than inventing content',
     '- Compress verbose answers into high-signal, concise statements — this document needs to be token-efficient',
-    '- For the "WHEN IN DOUBT" section, derive decision rules from patterns in their answers — but flag that these are inferred and ask the user to verify',
-    '- Do not include flattering or aspirational language — this is a functional document, not a LinkedIn bio',
+    '- For the "WHEN IN DOUBT" rules in Guardrails, derive decision rules from patterns in their answers — but flag that these are inferred and ask the user to verify',
+    '- Do not include flattering or aspirational language — this is a functional skill file, not a LinkedIn bio',
     '- If the user\'s answers reveal they work in a regulated industry or handle sensitive information, note this prominently in the constraints section',
   ],
-  outputFile: 'CLAUDE.md',
+  outputFile: '.claude/skills/business-context/SKILL.md',
 };
 
 // ─── Specification Engineer ──────────────────────────────────────────────────
