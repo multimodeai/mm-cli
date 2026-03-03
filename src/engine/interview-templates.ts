@@ -410,6 +410,7 @@ Followed by a completeness check.
     '- If the user\'s answers reveal they work in a regulated industry or handle sensitive information, note this prominently in the constraints section',
   ],
   outputFile: '.claude/skills/business-context/SKILL.md',
+  enableTools: true,
 };
 
 // ─── Specification Engineer ──────────────────────────────────────────────────
