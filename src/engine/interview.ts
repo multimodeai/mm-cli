@@ -87,12 +87,30 @@ export async function runInterview(
     apiMessages = [];
   }
 
-  // If there's initial input (e.g., from stdin pipe for rewrite), add it
+  // If there's initial input (e.g., skill name for skill new, piped stdin for rewrite),
+  // send it to Claude immediately so it can explore the codebase and respond before
+  // prompting the user. This lets Claude's first questions be grounded in actual code.
   if (options.initialInput) {
     messages.push({ role: 'user', content: options.initialInput });
-    if (apiMessages) {
+
+    let greeting: string;
+
+    if (config.enableTools && apiMessages) {
       apiMessages.push({ role: 'user', content: options.initialInput });
+      const result = await client.sendWithTools(
+        systemPrompt, apiMessages, tools,
+        (name, input) => printToolUse(name, input)
+      );
+      greeting = result.text;
+      apiMessages = result.apiMessages;
+    } else {
+      greeting = await client.send(systemPrompt, [
+        { role: 'user', content: options.initialInput },
+      ]);
     }
+
+    io.printAssistant(greeting);
+    messages.push({ role: 'assistant', content: greeting });
   } else {
     // Check if output file already exists — enter edit mode if so
     let startMsg = 'Begin the interview.';
