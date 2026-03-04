@@ -91,6 +91,7 @@ export function registerEval(program: Command): void {
     .description('Run eval suite against Claude API')
     .option('--without-skill', 'Run baseline without SKILL.md loaded')
     .option('--model <model>', 'Override Claude model')
+    .option('--judge <model>', 'Override judge model (default: eval.yaml judge or test model)')
     .action(async (skill: string, opts) => {
       const config = loadConfig();
       const apiKey = getApiKey(config);
@@ -110,10 +111,11 @@ export function registerEval(program: Command): void {
       }
 
       const model = opts.model || config.model || suite.model || DEFAULT_MODEL;
+      const judgeModel = opts.judge || suite.judge || model;
       const client = new ClaudeClient({ apiKey, model });
       const judgeClient = new ClaudeClient({
         apiKey,
-        model: suite.judge || model,
+        model: judgeModel,
       });
 
       try {

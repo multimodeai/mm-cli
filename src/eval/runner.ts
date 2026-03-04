@@ -59,6 +59,7 @@ export async function runEvalSuite(
 
   console.log(chalk.bold.cyan(`\nRunning eval: ${suite.name}`));
   console.log(chalk.dim(`Model: ${client.getModel()}`));
+  console.log(chalk.dim(`Judge: ${judgeClient.getModel()}`));
   console.log(chalk.dim(`Mode: ${options.withSkill ? 'WITH skill' : 'WITHOUT skill'}`));
   console.log(chalk.dim(`Scenarios: ${suite.scenarios.length}\n`));
 
@@ -86,7 +87,7 @@ export async function runEvalSuite(
     const response = await client.send(
       systemPrompt,
       [{ role: 'user', content: userMessage }],
-      4096
+      8192
     );
 
     // Score the response using Claude-as-judge

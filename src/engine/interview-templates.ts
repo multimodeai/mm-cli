@@ -695,7 +695,7 @@ Ask: "Let's build your personal eval suite. First, list your 5-7 most frequent A
 
 Wait for their response.
 
-Then ask: "Now pick 3 of those that matter most — the ones where AI quality has the biggest impact on your work. For each of those 3, tell me: (1) What does a great output look like? Be specific — not 'well-written,' but what specifically makes it great. (2) What does a bad output look like? What's the most common way AI gets this wrong? (3) Can you paste an example input you've used for this task — an actual prompt or request you've made?"
+Then ask: "Now pick 3 of those that matter most — the ones where AI quality has the biggest impact on your work. For each of those 3, tell me: (1) What does a great output look like? Be specific — not 'well-written,' but what specifically makes it great. (2) What does a bad output look like? What's the most common way AI gets this wrong? (3) Can you paste an example input you've used for this task — an actual prompt or request you've made? (4) Does this task require access to external systems (databases, APIs, live data)? If yes, provide sample/mock data I can embed directly in the test case."
 
 Wait for their response.
 
@@ -714,7 +714,11 @@ scenarios:
     prompt: |
       [The exact prompt/request to use — based on what the user shared,
       refined for clarity and self-containment. Use YAML literal block scalar.]
-    context: "[Optional context the model needs — project setup, file locations, etc.]"
+    context: |
+      [Required if the task depends on external data (DB records, API responses, files).
+      Embed mock/sample data inline so the scenario is self-contained and testable
+      without live system access. E.g. paste actual DB records, API response JSON,
+      or file contents the model needs to work with.]
     expected_qualities:
       - "[Specific quality criterion 1 — observable, checkable]"
       - "[Specific quality criterion 2]"
@@ -774,7 +778,7 @@ A valid YAML eval suite file with 3 test scenarios, each containing prompts, exp
     '- Do not invent example inputs — use what the user provides, or ask for specifics if they\'re too vague',
     '- If the user\'s tasks are too varied to build consistent test cases (e.g., "I use AI for everything"), help them narrow to the 3 most frequent and measurable tasks',
     '- Scoring rubric should be simple enough to use in under 2 minutes per test case — this needs to be fast to encourage regular use',
-    '- Flag if any test case requires information the model wouldn\'t have (proprietary data, real-time info) and suggest how to handle that',
+    '- CRITICAL: Every scenario must be self-contained. If a task requires external data (database records, API responses, live files), you MUST embed representative mock data in the context field. Scenarios that depend on live system access will score 0 because the model cannot query databases or call APIs during eval runs. Ask the user for sample data to include.',
   ],
   outputFile: 'evals/',
   enableTools: true,
