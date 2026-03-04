@@ -12,7 +12,31 @@ export function loadEvalSuite(evalDir: string): EvalSuite {
     throw new Error(`Eval suite not found: ${yamlPath}`);
   }
   const content = readFileSync(yamlPath, 'utf-8');
-  return yaml.parse(content) as EvalSuite;
+  const parsed = yaml.parse(content);
+
+  // Validate required fields
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`Invalid eval.yaml: expected YAML object, got ${typeof parsed}.\nRe-run: mm eval new <skill> --fresh`);
+  }
+  if (!parsed.name) {
+    throw new Error('Invalid eval.yaml: missing "name" field.\nRe-run: mm eval new <skill> --fresh');
+  }
+  if (!Array.isArray(parsed.scenarios) || parsed.scenarios.length === 0) {
+    throw new Error('Invalid eval.yaml: missing or empty "scenarios" array.\nRe-run: mm eval new <skill> --fresh');
+  }
+  for (const [i, s] of parsed.scenarios.entries()) {
+    if (!s.prompt) {
+      throw new Error(`Invalid eval.yaml: scenario ${i + 1} missing "prompt".\nRe-run: mm eval new <skill> --fresh`);
+    }
+    if (!Array.isArray(s.expected_qualities) || s.expected_qualities.length === 0) {
+      throw new Error(`Invalid eval.yaml: scenario "${s.name || i + 1}" missing "expected_qualities".\nRe-run: mm eval new <skill> --fresh`);
+    }
+    if (!s.scoring || typeof s.scoring.excellent !== 'number') {
+      throw new Error(`Invalid eval.yaml: scenario "${s.name || i + 1}" missing "scoring.excellent".\nRe-run: mm eval new <skill> --fresh`);
+    }
+  }
+
+  return parsed as EvalSuite;
 }
 
 export async function runEvalSuite(
