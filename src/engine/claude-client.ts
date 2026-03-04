@@ -49,7 +49,7 @@ export class ClaudeClient {
   async send(
     systemPrompt: string,
     messages: Message[],
-    maxTokens: number = 4096
+    maxTokens: number = 8192
   ): Promise<string> {
     const response = await this.client.messages.create({
       model: this.model,
