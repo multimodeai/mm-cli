@@ -16,6 +16,11 @@ export class StdinIO {
     });
   }
 
+  /**
+   * Prompt the user for input. Supports multi-line paste: lines arriving
+   * in rapid succession (< 50ms apart) are buffered and joined with \n.
+   * A single typed Enter still submits immediately.
+   */
   async prompt(message?: string): Promise<string> {
     if (this.closed) {
       throw new Error('Input stream closed');
@@ -26,14 +31,39 @@ export class StdinIO {
     }
     console.log();
 
+    process.stdout.write(chalk.cyan('You: '));
+
     return new Promise<string>((resolve, reject) => {
-      this.rl.question(chalk.cyan('You: '), (answer) => {
-        if (answer === undefined) {
-          reject(new Error('Input stream closed'));
+      const lines: string[] = [];
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const PASTE_WAIT_MS = 50;
+
+      const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        this.rl.removeListener('line', onLine);
+        this.rl.removeListener('close', onClose);
+      };
+
+      const onLine = (line: string) => {
+        lines.push(line);
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          cleanup();
+          resolve(lines.join('\n'));
+        }, PASTE_WAIT_MS);
+      };
+
+      const onClose = () => {
+        cleanup();
+        if (lines.length > 0) {
+          resolve(lines.join('\n'));
         } else {
-          resolve(answer);
+          reject(new Error('Input stream closed'));
         }
-      });
+      };
+
+      this.rl.on('line', onLine);
+      this.rl.on('close', onClose);
     });
   }
 
