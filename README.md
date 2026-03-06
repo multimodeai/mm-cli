@@ -5,7 +5,7 @@ A CLI that turns AI prompting from guesswork into engineering. Define what you w
 ## Install
 
 ```bash
-git clone https://github.com/hududed/mm-cli.git
+git clone https://github.com/multimodeai/mm-cli.git
 cd mm-cli
 npm install
 npm run build
@@ -78,6 +78,10 @@ A/B test your AI output with and without context engineering. Multi-axis 5-dimen
 | `mm skill list` | List skills in current project | stdout |
 | `mm skill validate` | Check skill structure | stdout |
 | `mm skill export --format cursor` | Export skills to other IDEs | .cursorrules / .windsurfrules |
+| `mm harness verify [spec]` | Verify codebase against spec | verify/\<spec\>/\<ts\>.json |
+| `mm harness audit` | Lock-in audit (5 dimensions, /25) | HARNESS-AUDIT.md |
+| `mm harness route <task>` | Task-to-harness routing advice | stdout |
+| `mm harness brief` | Executive switching cost summary | HARNESS-BRIEF.md |
 
 ## Tools During Interviews
 
@@ -106,7 +110,7 @@ The interview engine sends prompt templates as Claude's system message. Claude d
 ```
 ┌─────────────────────────────┐
 │  CLI Layer (Commander.js)   │
-│  16 commands                │
+│  20 commands                │
 └──────────┬──────────────────┘
            │
 ┌──────────▼──────────────────┐

@@ -4,7 +4,7 @@ Project instructions for Claude Code when building mm-cli.
 
 ## Project Overview
 
-mm-cli — a developer tool that operationalizes the 4 disciplines of AI input (Prompt Craft, Context Engineering, Intent Engineering, Specification Engineering) with measurable eval outcomes. 16 CLI commands mapping to the full prompt kit.
+mm-cli — a developer tool that operationalizes the 4 disciplines of AI input (Prompt Craft, Context Engineering, Intent Engineering, Specification Engineering) with measurable eval outcomes. 20 CLI commands mapping to the full prompt kit.
 
 **Read `SPEC.md` first** — it contains the complete build specification, architecture, and implementation sessions.
 

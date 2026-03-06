@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import chalk from 'chalk';
 import type { ClaudeClient } from '../engine/claude-client.js';
 import { CODEBASE_TOOLS } from '../engine/tools.js';
 import type { VerifyResult, VerifyCriterion, VerifyConstraint } from './types.js';
@@ -80,12 +81,10 @@ export async function runSpecVerify(
     { role: 'user', content: userMessage },
   ];
 
-  const onToolUse = options?.verbose
-    ? (name: string, input: Record<string, unknown>) => {
-        const detail = input.path || input.pattern || input.file_pattern || input.query || '';
-        console.log(`  ⚙ ${name}(${detail})`);
-      }
-    : undefined;
+  const onToolUse = (name: string, input: Record<string, unknown>) => {
+    const detail = input.path || input.pattern || input.file_pattern || input.query || '';
+    console.log(chalk.dim(`  ⚙ ${name}(${detail})`));
+  };
 
   const result = await client.sendWithTools(
     systemPrompt,
