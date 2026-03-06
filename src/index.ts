@@ -10,6 +10,7 @@ import { registerIntent } from './commands/intent.js';
 import { registerEval } from './commands/eval.js';
 import { registerConstraint } from './commands/constraint.js';
 import { registerSkill } from './commands/skill.js';
+import { registerHarness } from './commands/harness.js';
 
 const program = new Command();
 
@@ -35,6 +36,7 @@ registerIntent(program);
 registerEval(program);
 registerConstraint(program);
 registerSkill(program);
+registerHarness(program);
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
