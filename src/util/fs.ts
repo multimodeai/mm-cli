@@ -28,6 +28,10 @@ export function getEvalsDir(projectRoot: string): string {
   return join(projectRoot, 'evals');
 }
 
+export function getVerifyDir(projectRoot: string): string {
+  return join(projectRoot, 'verify');
+}
+
 export function ensureDir(dirPath: string): void {
   const { mkdirSync } = require('node:fs');
   mkdirSync(dirPath, { recursive: true });

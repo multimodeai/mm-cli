@@ -80,12 +80,12 @@ export class ClaudeClient {
     apiMessages: Anthropic.MessageParam[],
     tools: Anthropic.Tool[],
     onToolUse?: (name: string, input: Record<string, unknown>) => void,
-    maxTokens: number = 8192
+    maxTokens: number = 8192,
+    maxToolLoops: number = 15
   ): Promise<SendWithToolsResult> {
     const toolCalls: ToolCall[] = [];
     const currentMessages = [...apiMessages];
-    const MAX_TOOL_LOOPS = 15;
-    let loopsRemaining = MAX_TOOL_LOOPS;
+    let loopsRemaining = maxToolLoops;
 
     while (loopsRemaining-- > 0) {
       const response = await this.client.messages.create({
