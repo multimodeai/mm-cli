@@ -9,6 +9,9 @@ import {
   EVAL_HARNESS,
   CONSTRAINT_DESIGNER,
   SKILL_BUILD,
+  HARNESS_AUDIT,
+  HARNESS_ROUTE,
+  HARNESS_BRIEF,
   TEMPLATES,
 } from '../../src/engine/interview-templates.js';
 import type { InterviewConfig } from '../../src/engine/interview-types.js';
@@ -101,8 +104,8 @@ describe('Interview Templates', () => {
     expect(SKILL_BUILD.phases).toHaveLength(3);
   });
 
-  it('TEMPLATES registry has all 9 templates', () => {
-    expect(Object.keys(TEMPLATES)).toHaveLength(9);
+  it('TEMPLATES registry has all 12 templates', () => {
+    expect(Object.keys(TEMPLATES)).toHaveLength(12);
     expect(TEMPLATES['diagnose-quick']).toBe(DIAGNOSE_QUICK);
     expect(TEMPLATES['diagnose-deep']).toBe(DIAGNOSE_DEEP);
     expect(TEMPLATES['rewrite']).toBe(REWRITE);
@@ -112,5 +115,8 @@ describe('Interview Templates', () => {
     expect(TEMPLATES['eval-harness']).toBe(EVAL_HARNESS);
     expect(TEMPLATES['constraint-designer']).toBe(CONSTRAINT_DESIGNER);
     expect(TEMPLATES['skill-build']).toBe(SKILL_BUILD);
+    expect(TEMPLATES['harness-audit']).toBe(HARNESS_AUDIT);
+    expect(TEMPLATES['harness-route']).toBe(HARNESS_ROUTE);
+    expect(TEMPLATES['harness-brief']).toBe(HARNESS_BRIEF);
   });
 });
