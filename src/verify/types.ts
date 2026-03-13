@@ -1,6 +1,6 @@
 export interface VerifyCriterion {
   criterion: string;
-  status: 'met' | 'not_met' | 'partial' | 'unclear';
+  status: 'met' | 'not_met' | 'partial' | 'unclear' | 'unverifiable';
   evidence: string;
   confidence: 'high' | 'medium' | 'low';
 }
@@ -28,6 +28,7 @@ export interface VerifyResult {
     notMet: number;
     partial: number;
     unclear: number;
+    unverifiable: number;
     score: string;
   };
 }

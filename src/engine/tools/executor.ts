@@ -2,7 +2,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { resolve, relative } from 'node:path';
 
-const MAX_OUTPUT = 10000;
+const MAX_OUTPUT = 30000;
 const MAX_WEB_OUTPUT = 15000;
 
 /**
@@ -37,14 +37,19 @@ export async function executeTool(
             return `Error: ${rawPath} appears to be a binary file and cannot be read as text.`;
           }
         }
-        const content = buffer.toString('utf-8');
+        const fullContent = buffer.toString('utf-8');
+        const offset = (input.offset as number) || 0;
+        const content = offset > 0 ? fullContent.slice(offset) : fullContent;
         if (content.length > MAX_OUTPUT) {
+          const end = offset + MAX_OUTPUT;
           return (
             content.slice(0, MAX_OUTPUT) +
-            `\n\n... (truncated, file is ${content.length} chars total)`
+            `\n\n... (truncated at char ${end}, file is ${fullContent.length} chars total. Use offset: ${end} to continue reading.)`
           );
         }
-        return content;
+        return offset > 0
+          ? `(reading from offset ${offset})\n${content}`
+          : content;
       } catch (err: unknown) {
         return `Error reading file: ${(err as Error).message}`;
       }

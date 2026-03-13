@@ -4,7 +4,7 @@ export const CODEBASE_TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_file',
     description:
-      'Read a text file. Accepts relative paths (resolved against project root) or absolute paths for cross-directory access. For PDFs, use read_pdf instead.',
+      'Read a text file. Accepts relative paths (resolved against project root) or absolute paths for cross-directory access. For PDFs, use read_pdf instead. If a file is truncated, use offset to read the remaining content.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -12,6 +12,11 @@ export const CODEBASE_TOOLS: Anthropic.Tool[] = [
           type: 'string',
           description:
             'File path relative to project root (e.g. "src/index.ts") or absolute path (e.g. "/Users/foo/other-project/README.md")',
+        },
+        offset: {
+          type: 'number',
+          description:
+            'Character offset to start reading from. Use when a previous read was truncated to continue reading the rest of the file.',
         },
       },
       required: ['path'],

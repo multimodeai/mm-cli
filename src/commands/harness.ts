@@ -129,7 +129,92 @@ export function registerHarness(program: Command): void {
       }
     });
 
-  // Subcommand 4: brief
+  // Subcommand 4: attest
+  harness
+    .command('attest [spec-file]')
+    .description('Create a runtime evidence file for criteria that cannot be verified via source code')
+    .action(async (specFile: string | undefined) => {
+      try {
+        const resolvedSpec = resolveSpecFile(specFile);
+        const specName = basename(resolvedSpec, '.md');
+        const projectRoot = findProjectRoot() || process.cwd();
+        const evidenceDir = join(projectRoot, 'verify', 'evidence');
+        const evidencePath = join(evidenceDir, `${specName}.md`);
+
+        if (fileExists(evidencePath)) {
+          console.log(chalk.yellow(`\nEvidence file already exists: ${evidencePath}`));
+          console.log(chalk.dim('Edit it to update your runtime verification evidence.'));
+          return;
+        }
+
+        // Read spec and extract acceptance criteria
+        const specContent = readFileSync(resolvedSpec, 'utf-8');
+        const criteriaLines: string[] = [];
+        const criteriaRegex = /^\s*(?:[-*]|\d+[.)]) ?\[?\d*\]?\s*(.+)/gm;
+        let inCriteria = false;
+        for (const line of specContent.split('\n')) {
+          if (/acceptance\s+criteria/i.test(line)) {
+            inCriteria = true;
+            continue;
+          }
+          if (inCriteria && /^#{1,3}\s/.test(line) && !/acceptance/i.test(line)) {
+            inCriteria = false;
+          }
+          if (inCriteria) {
+            const match = line.match(/^\s*(?:[-*]|\d+[.)]) ?\[?\d*\]?\s*(.+)/);
+            if (match) {
+              criteriaLines.push(match[1].trim());
+            }
+          }
+        }
+
+        // Generate template
+        const template = [
+          `# Runtime Evidence: ${specName}`,
+          ``,
+          `> This file provides runtime verification evidence for criteria that`,
+          `> cannot be verified via source code analysis alone.`,
+          `> Run \`mm harness verify ${basename(resolvedSpec)}\` after filling this in.`,
+          ``,
+          `**Verified by:** [Your name]`,
+          `**Date:** ${new Date().toISOString().split('T')[0]}`,
+          `**Environment:** [e.g., production, staging, local]`,
+          ``,
+          `## Criteria Evidence`,
+          ``,
+        ];
+
+        if (criteriaLines.length > 0) {
+          for (let i = 0; i < criteriaLines.length; i++) {
+            template.push(`### [${i + 1}] ${criteriaLines[i]}`);
+            template.push(``);
+            template.push(`- **Status:** [ ] verified  [ ] failed  [ ] skipped`);
+            template.push(`- **Evidence:** <!-- Describe what you observed, paste output, attach screenshots -->`);
+            template.push(`- **Command/method:** <!-- How you verified this -->`);
+            template.push(``);
+          }
+        } else {
+          template.push(`<!-- Could not auto-extract criteria. Add your evidence below: -->`);
+          template.push(``);
+          template.push(`### Criterion`);
+          template.push(`- **Status:** [ ] verified  [ ] failed  [ ] skipped`);
+          template.push(`- **Evidence:**`);
+          template.push(``);
+        }
+
+        mkdirSync(evidenceDir, { recursive: true });
+        writeFileSync(evidencePath, template.join('\n'), 'utf-8');
+        console.log(chalk.green(`\n✓ Created evidence template: ${evidencePath}`));
+        console.log(chalk.dim('Fill in the runtime verification evidence, then re-run:'));
+        const relSpec = resolvedSpec.startsWith(projectRoot) ? resolvedSpec.slice(projectRoot.length + 1) : basename(resolvedSpec);
+        console.log(chalk.dim(`  mm harness verify ${relSpec}`));
+      } catch (err: any) {
+        console.error(chalk.red(`\n✗ ${err.message}`));
+        process.exit(1);
+      }
+    });
+
+  // Subcommand 5: brief
   harness
     .command('brief')
     .description('Generate a one-page Architecture Decision Brief for leadership')

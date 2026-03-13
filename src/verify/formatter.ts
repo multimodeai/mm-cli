@@ -46,8 +46,23 @@ export function formatVerifyResult(result: VerifyResult): string {
 
   // Summary
   lines.push(chalk.bold(`\nSUMMARY: ${result.summary.score}`));
-  if (result.summary.partial > 0) {
-    lines.push(chalk.dim(`  ${result.summary.partial} partial, ${result.summary.unclear} unclear`));
+  const details: string[] = [];
+  if (result.summary.partial > 0) details.push(`${result.summary.partial} partial`);
+  if (result.summary.unclear > 0) details.push(`${result.summary.unclear} unclear`);
+  if (result.summary.unverifiable > 0) details.push(`${result.summary.unverifiable} unverifiable (runtime-only)`);
+  if (details.length > 0) {
+    lines.push(chalk.dim(`  ${details.join(', ')}`));
+  }
+
+  // Hint about evidence files if there are unverifiable criteria
+  if (result.summary.unverifiable > 0) {
+    lines.push('');
+    lines.push(chalk.yellow(`  ℹ ${result.summary.unverifiable} criteria require runtime verification.`));
+    lines.push(chalk.yellow('    Create an evidence file to verify them:'));
+    // Show relative path (e.g. specs/foo.md) if possible, otherwise just filename
+    const specsMatch = result.specFile.match(/(?:^|\/)(specs\/[^/]+\.md)$/);
+    const attestPath = specsMatch ? specsMatch[1] : result.specFile.replace(/.*\//, '');
+    lines.push(chalk.yellow(`    mm harness attest ${attestPath}`));
   }
 
   return lines.join('\n');
@@ -59,6 +74,7 @@ function statusIcon(status: string): string {
     case 'not_met': return chalk.red('✗');
     case 'partial': return chalk.yellow('◐');
     case 'unclear': return chalk.dim('?');
+    case 'unverifiable': return chalk.blue('⊘');
     default: return chalk.dim('?');
   }
 }

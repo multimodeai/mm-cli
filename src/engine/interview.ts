@@ -152,6 +152,8 @@ export async function runInterview(
   let turn = 0;
   let saved = false;
   let savedContent = '';
+  let interrupted = false;
+  const isEditMode = !!loadExistingArtifact(options);
 
   while (turn < MAX_TURNS) {
     turn++;
@@ -162,6 +164,7 @@ export async function runInterview(
     } catch {
       // stdin closed or Ctrl-C
       console.log(chalk.dim('\nInterview interrupted.'));
+      interrupted = true;
       break;
     }
 
@@ -212,7 +215,8 @@ export async function runInterview(
   }
 
   // If interview was interrupted before completion detection, still save if we have content
-  if (options.outputFile && !saved && artifact) {
+  // BUT: in edit mode, interruption means "cancel" — don't overwrite the existing file
+  if (options.outputFile && !saved && artifact && !(interrupted && isEditMode)) {
     writeArtifact(options.outputFile, artifact);
   }
 
