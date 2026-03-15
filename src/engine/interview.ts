@@ -202,6 +202,7 @@ export async function runInterview(
         console.log(chalk.dim(`\n  📄 Full discovery log: ${discoveryLogFile}`));
       }
       io.printAssistant(result.text);
+      console.log(chalk.cyan('\n  Discovery phases complete. Review the inventory above and respond to continue.\n'));
     }
   }
 
