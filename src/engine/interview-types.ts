@@ -14,6 +14,14 @@ export interface InterviewConfig {
   outputFile?: string;
   /** When true, Claude can explore the codebase via read_file, list_files, search_files, read_pdf tools */
   enableTools?: boolean;
+  /** Max tool loop iterations per turn. Default: 15 */
+  maxToolLoops?: number;
+  /**
+   * Auto-continue discovery phases. Each entry is a prompt sent automatically
+   * after the previous tool turn completes, giving Claude a fresh 15-tool budget
+   * per phase. The user is only prompted after all discovery phases finish.
+   */
+  discoveryPhases?: string[];
 }
 
 export interface Message {

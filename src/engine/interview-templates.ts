@@ -15,5 +15,6 @@ export {
   HARNESS_AUDIT,
   HARNESS_ROUTE,
   HARNESS_BRIEF,
+  SPEC_QA,
   TEMPLATES,
 } from './templates/index.js';

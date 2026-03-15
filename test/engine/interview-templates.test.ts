@@ -12,6 +12,7 @@ import {
   HARNESS_AUDIT,
   HARNESS_ROUTE,
   HARNESS_BRIEF,
+  SPEC_QA,
   TEMPLATES,
 } from '../../src/engine/interview-templates.js';
 import type { InterviewConfig } from '../../src/engine/interview-types.js';
@@ -73,6 +74,20 @@ describe('Interview Templates', () => {
     expect(SPEC_NEW.systemPrompt).toContain('7. DEFINITION OF DONE');
   });
 
+  it('SPEC_QA has 5 discovery-first phases and coverage math constraint', () => {
+    validateTemplate(SPEC_QA);
+    expect(SPEC_QA.systemPrompt).toContain('QA specification engineer');
+    expect(SPEC_QA.systemPrompt).toContain('PHASE 1 — DISCOVERY');
+    expect(SPEC_QA.systemPrompt).toContain('PHASE 2 — COVERAGE MATRIX');
+    expect(SPEC_QA.systemPrompt).toContain('PHASE 3 — EXCLUSION INTERVIEW');
+    expect(SPEC_QA.systemPrompt).toContain('PHASE 4 — TEST SPEC');
+    expect(SPEC_QA.systemPrompt).toContain('PHASE 5 — SELF-VALIDATION');
+    expect(SPEC_QA.systemPrompt).toContain('routes_in_spec + routes_in_exclusions == routes_discovered');
+    expect(SPEC_QA.systemPrompt).toContain('7. DEFINITION OF DONE');
+    expect(SPEC_QA.phases).toHaveLength(5);
+    expect(SPEC_QA.enableTools).toBe(true);
+  });
+
   it('INTENT_INIT has Rigor Test section', () => {
     validateTemplate(INTENT_INIT);
     expect(INTENT_INIT.systemPrompt).toContain('RIGOR TEST');
@@ -104,13 +119,14 @@ describe('Interview Templates', () => {
     expect(SKILL_BUILD.phases).toHaveLength(3);
   });
 
-  it('TEMPLATES registry has all 12 templates', () => {
-    expect(Object.keys(TEMPLATES)).toHaveLength(12);
+  it('TEMPLATES registry has all 13 templates', () => {
+    expect(Object.keys(TEMPLATES)).toHaveLength(13);
     expect(TEMPLATES['diagnose-quick']).toBe(DIAGNOSE_QUICK);
     expect(TEMPLATES['diagnose-deep']).toBe(DIAGNOSE_DEEP);
     expect(TEMPLATES['rewrite']).toBe(REWRITE);
     expect(TEMPLATES['context-build']).toBe(CONTEXT_BUILD);
     expect(TEMPLATES['spec-new']).toBe(SPEC_NEW);
+    expect(TEMPLATES['spec-qa']).toBe(SPEC_QA);
     expect(TEMPLATES['intent-init']).toBe(INTENT_INIT);
     expect(TEMPLATES['eval-harness']).toBe(EVAL_HARNESS);
     expect(TEMPLATES['constraint-designer']).toBe(CONSTRAINT_DESIGNER);

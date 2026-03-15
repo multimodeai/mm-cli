@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import chalk from 'chalk';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { InterviewConfig, InterviewResult, Message } from './interview-types.js';
@@ -155,6 +156,55 @@ export async function runInterview(
   let interrupted = false;
   const isEditMode = !!loadExistingArtifact(options);
 
+  // Auto-continue discovery phases — each gets its own tool budget.
+  // Full output is logged to a discovery file so the user can review it
+  // (terminal scroll buffer overflows with 7 phases of tool output).
+  const discoveryPhases = config.discoveryPhases ? [...config.discoveryPhases] : [];
+  let discoveryLog = '';
+  const discoveryLogFile = options.outputFile
+    ? options.outputFile.replace(/\.md$/, '-discovery.md')
+    : null;
+
+  let phaseIndex = 0;
+  while (discoveryPhases.length > 0 && config.enableTools && apiMessages) {
+    phaseIndex++;
+    const phasePrompt = discoveryPhases.shift()!;
+    // Extract phase label from prompt (e.g. "Phase 1B — API/Endpoint Inventory")
+    const labelMatch = phasePrompt.match(/Phase \d[A-G]\s*[—–-]\s*([^.]+)/);
+    const phaseLabel = labelMatch ? labelMatch[0] : `Discovery phase ${phaseIndex}`;
+    console.log(chalk.cyan(`\n  → ${phaseLabel}`));
+
+    messages.push({ role: 'user', content: phasePrompt });
+    apiMessages.push({ role: 'user', content: phasePrompt });
+
+    const result = await client.sendWithTools(
+      systemPrompt, apiMessages, tools,
+      (name, input) => printToolUse(name, input)
+    );
+    apiMessages = result.apiMessages;
+    messages.push({ role: 'assistant', content: result.text });
+
+    // Log full output to file, show compact summary in terminal
+    discoveryLog += `\n\n${'═'.repeat(60)}\n${phaseLabel}\n${'═'.repeat(60)}\n\n${result.text}`;
+
+    if (discoveryLogFile) {
+      mkdirSync(dirname(discoveryLogFile), { recursive: true });
+      writeFileSync(discoveryLogFile, discoveryLog.trimStart(), 'utf-8');
+    }
+
+    // Count lines as a rough indicator of findings
+    const lineCount = result.text.split('\n').filter(l => l.trim()).length;
+    console.log(chalk.dim(`    ✓ ${lineCount} lines of findings logged`));
+
+    // Only print the last consolidation phase to terminal (it's the user-facing summary)
+    if (discoveryPhases.length === 0) {
+      if (discoveryLogFile) {
+        console.log(chalk.dim(`\n  📄 Full discovery log: ${discoveryLogFile}`));
+      }
+      io.printAssistant(result.text);
+    }
+  }
+
   while (turn < MAX_TURNS) {
     turn++;
     let userInput: string;
@@ -214,9 +264,9 @@ export async function runInterview(
     writeArtifact(options.outputFile, artifact);
   }
 
-  // If interview was interrupted before completion detection, still save if we have content
-  // BUT: in edit mode, interruption means "cancel" — don't overwrite the existing file
-  if (options.outputFile && !saved && artifact && !(interrupted && isEditMode)) {
+  // Interrupted = cancel. Never save on Ctrl-C.
+  // Only save if the interview completed normally and wasn't already saved by completion detection.
+  if (options.outputFile && !saved && artifact && !interrupted) {
     writeArtifact(options.outputFile, artifact);
   }
 
@@ -327,6 +377,7 @@ function isLikelyComplete(response: string, config: InterviewConfig): boolean {
     'skill-build': ['## Self-Improvement', '## Guardrails'],
     'context-build': ['KNOWN AI PATTERNS', 'INSTITUTIONAL CONTEXT'],
     'spec-new': ['DEFINITION OF DONE', '7. DEFINITION'],
+    'spec-qa': ['DEFINITION OF DONE', '7. DEFINITION', 'SELF-VALIDATION'],
     'intent-init': ['DECISION AUTHORITY MAP', 'RIGOR TEST'],
     'eval-harness': ['RESULT LOG', 'TEST CASE'],
     'constraint-designer': ['ESCALATE', 'MUST NOT DO'],

@@ -109,6 +109,15 @@ export class ClaudeClient {
           .map(b => b.text)
           .join('\n');
 
+        // If Claude finished tool use but produced no text, nudge it to respond
+        if (!text.trim() && toolCalls.length > 0) {
+          currentMessages.push({
+            role: 'user',
+            content: '[SYSTEM: You used tools but produced no visible response. Based on what you just read, please continue — ask your next question or provide your analysis.]',
+          });
+          continue;
+        }
+
         return { text, apiMessages: currentMessages, toolCalls };
       }
 
@@ -136,7 +145,7 @@ export class ClaudeClient {
         const last = toolResults[toolResults.length - 1];
         const existing = typeof last.content === 'string' ? last.content : '';
         last.content = existing +
-          '\n\n[SYSTEM: You are approaching the tool use limit. Stop exploring and produce your final output NOW. If you are verifying a spec, output the JSON assessment immediately with what you have found so far. If you are in an interview, summarize and ask your question.]';
+          '\n\n[SYSTEM: You are approaching the tool use limit for this turn. Summarize what you have found so far and output your findings for this phase. Do NOT try to squeeze in more discovery — the next phase will give you a fresh tool budget. If you are verifying a spec, output the JSON assessment immediately.]';
       }
 
       // Send tool results back to Claude

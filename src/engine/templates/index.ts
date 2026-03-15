@@ -12,6 +12,7 @@ export { SKILL_BUILD } from './skill-build.js';
 export { HARNESS_AUDIT } from './harness-audit.js';
 export { HARNESS_ROUTE } from './harness-route.js';
 export { HARNESS_BRIEF } from './harness-brief.js';
+export { SPEC_QA } from './spec-qa.js';
 
 import { DIAGNOSE_QUICK } from './diagnose-quick.js';
 import { DIAGNOSE_DEEP } from './diagnose-deep.js';
@@ -25,6 +26,7 @@ import { SKILL_BUILD } from './skill-build.js';
 import { HARNESS_AUDIT } from './harness-audit.js';
 import { HARNESS_ROUTE } from './harness-route.js';
 import { HARNESS_BRIEF } from './harness-brief.js';
+import { SPEC_QA } from './spec-qa.js';
 
 export const TEMPLATES: Record<string, InterviewConfig> = {
   'diagnose-quick': DIAGNOSE_QUICK,
@@ -32,6 +34,7 @@ export const TEMPLATES: Record<string, InterviewConfig> = {
   'rewrite': REWRITE,
   'context-build': CONTEXT_BUILD,
   'spec-new': SPEC_NEW,
+  'spec-qa': SPEC_QA,
   'intent-init': INTENT_INIT,
   'eval-harness': EVAL_HARNESS,
   'constraint-designer': CONSTRAINT_DESIGNER,
