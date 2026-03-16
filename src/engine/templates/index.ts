@@ -13,6 +13,9 @@ export { HARNESS_AUDIT } from './harness-audit.js';
 export { HARNESS_ROUTE } from './harness-route.js';
 export { HARNESS_BRIEF } from './harness-brief.js';
 export { SPEC_QA } from './spec-qa.js';
+export { SPEC_DECOMPOSE } from './spec-decompose.js';
+export { DIAGNOSE_HEALTH } from './diagnose-health.js';
+export { HARNESS_SECURITY } from './harness-security.js';
 
 import { DIAGNOSE_QUICK } from './diagnose-quick.js';
 import { DIAGNOSE_DEEP } from './diagnose-deep.js';
@@ -27,6 +30,9 @@ import { HARNESS_AUDIT } from './harness-audit.js';
 import { HARNESS_ROUTE } from './harness-route.js';
 import { HARNESS_BRIEF } from './harness-brief.js';
 import { SPEC_QA } from './spec-qa.js';
+import { SPEC_DECOMPOSE } from './spec-decompose.js';
+import { DIAGNOSE_HEALTH } from './diagnose-health.js';
+import { HARNESS_SECURITY } from './harness-security.js';
 
 export const TEMPLATES: Record<string, InterviewConfig> = {
   'diagnose-quick': DIAGNOSE_QUICK,
@@ -42,4 +48,7 @@ export const TEMPLATES: Record<string, InterviewConfig> = {
   'harness-audit': HARNESS_AUDIT,
   'harness-route': HARNESS_ROUTE,
   'harness-brief': HARNESS_BRIEF,
+  'harness-security': HARNESS_SECURITY,
+  'spec-decompose': SPEC_DECOMPOSE,
+  'diagnose-health': DIAGNOSE_HEALTH,
 };

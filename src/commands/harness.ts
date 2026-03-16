@@ -5,7 +5,7 @@ import chalk from 'chalk';
 import { ClaudeClient } from '../engine/claude-client.js';
 import { StdinIO } from '../engine/stdin-io.js';
 import { runInterview } from '../engine/interview.js';
-import { HARNESS_AUDIT, HARNESS_ROUTE, HARNESS_BRIEF } from '../engine/interview-templates.js';
+import { HARNESS_AUDIT, HARNESS_ROUTE, HARNESS_BRIEF, HARNESS_SECURITY } from '../engine/interview-templates.js';
 import { runSpecVerify, formatVerifyResult, VERIFY_SYSTEM_PROMPT } from '../verify/index.js';
 import { loadConfig, getApiKey, DEFAULT_MODEL } from '../util/config.js';
 import { findProjectRoot, fileExists } from '../util/fs.js';
@@ -79,6 +79,7 @@ export function registerHarness(program: Command): void {
     .command('audit')
     .description('Audit your harness lock-in across 5 divergence dimensions')
     .option('--model <model>', 'Override Claude model')
+    .option('--security', 'Security & resilience audit instead of lock-in audit')
     .option('--dry-run', 'Print system prompt without calling API')
     .action(async (opts) => {
       const config = loadConfig();
@@ -88,11 +89,13 @@ export function registerHarness(program: Command): void {
         model: opts.model || config.model || DEFAULT_MODEL,
       });
       const io = new StdinIO();
+      const template = opts.security ? HARNESS_SECURITY : HARNESS_AUDIT;
+      const outputFile = opts.security ? 'SECURITY-AUDIT.md' : 'HARNESS-AUDIT.md';
 
       try {
-        await runInterview(HARNESS_AUDIT, client, io, {
+        await runInterview(template, client, io, {
           dryRun: opts.dryRun,
-          outputFile: 'HARNESS-AUDIT.md',
+          outputFile,
         });
       } catch (err: any) {
         console.error(chalk.red(`\n✗ ${err.message}`));

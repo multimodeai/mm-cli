@@ -4,12 +4,13 @@ import chalk from 'chalk';
 import { ClaudeClient } from '../engine/claude-client.js';
 import { StdinIO } from '../engine/stdin-io.js';
 import { runInterview } from '../engine/interview.js';
-import { SPEC_NEW, SPEC_QA } from '../engine/interview-templates.js';
+import { SPEC_NEW, SPEC_QA, SPEC_DECOMPOSE } from '../engine/interview-templates.js';
 import { loadConfig, getApiKey, DEFAULT_MODEL } from '../util/config.js';
 
 const SPEC_TYPES: Record<string, typeof SPEC_NEW> = {
   default: SPEC_NEW,
   qa: SPEC_QA,
+  decompose: SPEC_DECOMPOSE,
 };
 
 export function registerSpec(program: Command): void {
@@ -21,7 +22,7 @@ export function registerSpec(program: Command): void {
     .command('new [name]')
     .description('3-phase interview to build a specification')
     .option('--model <model>', 'Override Claude model')
-    .option('--type <type>', 'Spec type: default, qa', 'default')
+    .option('--type <type>', 'Spec type: default, qa, decompose', 'default')
     .option('--dry-run', 'Print messages without calling API')
     .option('--fresh', 'Start from scratch even if output file exists')
     .action(async (name: string | undefined, opts) => {

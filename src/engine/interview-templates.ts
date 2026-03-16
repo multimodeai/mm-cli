@@ -16,5 +16,8 @@ export {
   HARNESS_ROUTE,
   HARNESS_BRIEF,
   SPEC_QA,
+  SPEC_DECOMPOSE,
+  DIAGNOSE_HEALTH,
+  HARNESS_SECURITY,
   TEMPLATES,
 } from './templates/index.js';
