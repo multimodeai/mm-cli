@@ -51,7 +51,7 @@ export class ClaudeClient {
     messages: Message[],
     maxTokens: number = 8192
   ): Promise<string> {
-    const response = await this.client.messages.create({
+    const response = await this.createWithRetry({
       model: this.model,
       max_tokens: maxTokens,
       system: systemPrompt,
@@ -88,7 +88,7 @@ export class ClaudeClient {
     let loopsRemaining = maxToolLoops;
 
     while (loopsRemaining-- > 0) {
-      const response = await this.client.messages.create({
+      const response = await this.createWithRetry({
         model: this.model,
         max_tokens: maxTokens,
         system: systemPrompt,
@@ -153,6 +153,29 @@ export class ClaudeClient {
     }
 
     throw new Error('Tool use loop exceeded maximum iterations');
+  }
+
+  /**
+   * Retry API calls on 500/529 errors with exponential backoff.
+   */
+  private async createWithRetry(
+    params: Anthropic.MessageCreateParams,
+    maxRetries: number = 3
+  ): Promise<Anthropic.Message> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.client.messages.create(params);
+      } catch (err: unknown) {
+        const status = (err as any)?.status;
+        if ((status === 500 || status === 529) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error('Unreachable');
   }
 
   getModel(): string {

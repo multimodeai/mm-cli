@@ -69,6 +69,37 @@ export const CODEBASE_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'list_directory',
+    description:
+      'List all files and subdirectories in a directory (non-recursive). Returns names with trailing / for directories. Useful for understanding project structure.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: {
+          type: 'string',
+          description:
+            'Directory path relative to project root (default: project root). E.g. "src", "specs", "."',
+        },
+      },
+    },
+  },
+  {
+    name: 'git_info',
+    description:
+      'Get git repository information. Supports: "status" (working tree status), "log" (recent commits), "diff" (uncommitted changes summary), "branch" (current branch info).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        command: {
+          type: 'string',
+          enum: ['status', 'log', 'diff', 'branch'],
+          description: 'Git command to run: status, log (last 20 commits), diff (stat only), or branch',
+        },
+      },
+      required: ['command'],
+    },
+  },
+  {
     name: 'read_pdf',
     description:
       'Extract text from a PDF file. For large PDFs (20+ pages), use the pages parameter to read in chunks. Accepts relative or absolute paths. Requires pdftotext (poppler).',

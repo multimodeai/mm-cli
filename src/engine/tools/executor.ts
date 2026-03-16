@@ -78,6 +78,52 @@ export async function executeTool(
       }
     }
 
+    case 'list_directory': {
+      const dirPath = input.path
+        ? resolve(cwd, input.path as string)
+        : cwd;
+      if (!existsSync(dirPath)) {
+        return `Error: Directory not found: ${input.path || '.'}`;
+      }
+      if (!statSync(dirPath).isDirectory()) {
+        return `Error: ${input.path} is a file, not a directory.`;
+      }
+      try {
+        const cmd = `ls -1F "${dirPath}" 2>/dev/null | grep -v "^$" | head -200`;
+        const result = execSync(cmd, { encoding: 'utf-8', timeout: 5000 });
+        return result.trim() || 'Empty directory';
+      } catch {
+        return 'Error listing directory';
+      }
+    }
+
+    case 'git_info': {
+      const command = input.command as string;
+      try {
+        let cmd: string;
+        switch (command) {
+          case 'status':
+            cmd = 'git status --short 2>/dev/null';
+            break;
+          case 'log':
+            cmd = 'git log --oneline --no-decorate -20 2>/dev/null';
+            break;
+          case 'diff':
+            cmd = 'git diff --stat 2>/dev/null';
+            break;
+          case 'branch':
+            cmd = 'git branch -v 2>/dev/null';
+            break;
+          default:
+            return `Error: Unknown git command "${command}". Use: status, log, diff, branch`;
+        }
+        const result = execSync(cmd, { encoding: 'utf-8', timeout: 10000, cwd });
+        return result.trim() || `No output from git ${command}`;
+      } catch {
+        return 'Error: Not a git repository or git is not available';
+      }
+    }
+
     case 'search_files': {
       const searchPath = input.path
         ? resolve(cwd, input.path as string)
