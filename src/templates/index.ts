@@ -67,8 +67,8 @@ export const TILE_SCAFFOLD_JSON = `{
 
 export const EVAL_SCAFFOLD_YAML = `name: {{NAME}}-eval
 skill: .claude/skills/{{NAME}}/SKILL.md
-model: claude-sonnet-4-20250514
-judge: claude-sonnet-4-20250514
+model: claude-sonnet-4-6
+judge: claude-sonnet-4-6
 
 scenarios:
   - name: basic-usage

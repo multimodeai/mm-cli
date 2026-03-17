@@ -78,10 +78,10 @@ export const CODEBASE_TOOLS: Anthropic.Tool[] = [
         path: {
           type: 'string',
           description:
-            'Directory path relative to project root (default: project root). E.g. "src", "specs", "."',
+            'Directory path relative to project root. Use "." for project root. E.g. "src", "specs", "."',
         },
       },
-      required: [],
+      required: ['path'],
     },
   },
   {
@@ -93,8 +93,7 @@ export const CODEBASE_TOOLS: Anthropic.Tool[] = [
       properties: {
         command: {
           type: 'string',
-          enum: ['status', 'log', 'diff', 'branch'],
-          description: 'Git command to run: status, log (last 20 commits), diff (stat only), or branch',
+          description: 'Git command to run. One of: status, log, diff, branch',
         },
       },
       required: ['command'],

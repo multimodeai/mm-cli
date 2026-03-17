@@ -33,14 +33,12 @@ export class ClaudeClient {
         authToken: options.apiKey,
         defaultHeaders: {
           'anthropic-beta': 'oauth-2025-04-20',
-          'user-agent': 'mm-cli/0.1.0',
-          'x-app': 'cli',
         },
       });
     } else {
       this.client = new Anthropic({ apiKey: options.apiKey });
     }
-    this.model = options.model || 'claude-sonnet-4-20250514';
+    this.model = options.model || 'claude-sonnet-4-6';
   }
 
   /**
@@ -171,6 +169,11 @@ export class ClaudeClient {
           const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
           await new Promise(r => setTimeout(r, delay));
           continue;
+        }
+        // Log full error details for debugging
+        const errBody = (err as any)?.error || (err as any)?.body || (err as any)?.message;
+        if (errBody) {
+          console.error(`\nAPI error (attempt ${attempt + 1}/${maxRetries + 1}):`, JSON.stringify(errBody, null, 2));
         }
         throw err;
       }

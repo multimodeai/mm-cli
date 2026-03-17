@@ -27,8 +27,8 @@ FORMAT THE OUTPUT AS VALID YAML matching this exact schema:
 
 name: [skill-name]-eval
 skill: .claude/skills/[skill-name]/SKILL.md
-model: claude-sonnet-4-20250514
-judge: claude-sonnet-4-20250514
+model: claude-sonnet-4-6
+judge: claude-sonnet-4-6
 scenarios:
   - name: "[Task Name]"
     prompt: |
