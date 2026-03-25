@@ -36,10 +36,7 @@ Generate the complete SKILL.md with this exact structure:
 \`\`\`
 ---
 name: <skill-name>
-version: 1.0.0
-triggers:
-  - "<trigger1>"
-  - "<trigger2>"
+description: <one-line description — used by Claude Code to decide when to activate this skill>
 ---
 
 # <Skill Name> Skill
@@ -85,7 +82,7 @@ A complete SKILL.md file that encodes domain-specific expertise for AI agents wo
     '- Include ONLY patterns and conventions that actually exist in the codebase — do not invent conventions',
     '- Keep the skill file under 200 lines — this is a constraint, not a suggestion',
     '- Every instruction must be specific enough that a different AI model could follow it without ambiguity',
-    '- Include the YAML frontmatter with name, version, and triggers — validation depends on it',
+    '- Include the YAML frontmatter with name and description — validation depends on it. Version and triggers go in tile.json, NOT in frontmatter.',
     '- Do not produce generic skill content like "follow best practices" — name the actual practices from the codebase',
     '- If the codebase has too little context for a useful skill, say so honestly and produce a minimal starter instead of padding with generic content',
   ],

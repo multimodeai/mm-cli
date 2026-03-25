@@ -63,8 +63,8 @@ export function validateSkill(projectRoot: string, name: string): ValidationIssu
         if (!frontmatter.includes('name:')) {
           issues.push({ skill: name, severity: 'warning', message: 'Frontmatter missing "name" field' });
         }
-        if (!frontmatter.includes('version:')) {
-          issues.push({ skill: name, severity: 'warning', message: 'Frontmatter missing "version" field' });
+        if (!frontmatter.includes('description:')) {
+          issues.push({ skill: name, severity: 'warning', message: 'Frontmatter missing "description" field' });
         }
       }
     }
