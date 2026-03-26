@@ -65,9 +65,12 @@ A/B test your AI output with and without context engineering. Multi-axis 5-dimen
 | `mm preflight` | Print the 7 pre-prompting questions | stdout |
 | `mm diagnose` | 5-question AI workflow diagnostic | CONTEXT.md |
 | `mm diagnose --deep` | 12-question deep diagnostic + roadmap | DIAGNOSTIC.md |
+| `mm diagnose --health` | Automated project health check — scores agent-readiness | HEALTH.md |
 | `mm rewrite` | Rewrite vague requests into clear ones | stdout / REWRITE.md |
 | `mm context build` | 7-domain interview for business context | .claude/skills/business-context/SKILL.md |
 | `mm spec new [name]` | Specification engineer (3-phase interview) | specs/\<name\>.md or SPEC.md |
+| `mm spec new [name] --type decompose` | Break large changes into safe, ordered steps | specs/\<name\>.md |
+| `mm spec new [name] --type qa` | QA specification with discovery + coverage math | specs/\<name\>.md |
 | `mm intent init` | Intent & delegation framework | INTENT.md |
 | `mm constraint <task>` | Constraint architecture (must/must-not/prefer/escalate) | constraints/\<task\>.md |
 | `mm eval new <skill>` | Build eval suite via interview | evals/\<skill\>/eval.yaml |
@@ -80,6 +83,7 @@ A/B test your AI output with and without context engineering. Multi-axis 5-dimen
 | `mm skill export --format cursor` | Export skills to other IDEs | .cursorrules / .windsurfrules |
 | `mm harness verify [spec]` | Verify codebase against spec | verify/\<spec\>/\<ts\>.json |
 | `mm harness audit` | Lock-in audit (5 dimensions, /25) | HARNESS-AUDIT.md |
+| `mm harness audit --security` | Security & resilience audit | SECURITY-AUDIT.md |
 | `mm harness route <task>` | Task-to-harness routing advice | stdout |
 | `mm harness brief` | Executive switching cost summary | HARNESS-BRIEF.md |
 
@@ -89,7 +93,9 @@ Commands that need codebase access (`spec`, `eval`, `constraint`, `intent`) give
 
 - **read_file** — Read any project file
 - **list_files** — Find files by pattern
+- **list_directory** — List directory contents
 - **search_files** — Grep file contents
+- **git_info** — Git log, diff, blame for repository context
 - **web_search** — Search the web (DuckDuckGo, no API key needed)
 - **web_fetch** — Fetch and read web pages
 
@@ -98,7 +104,7 @@ Claude reads your code before asking questions, and searches arxiv/docs when res
 ## Global Flags
 
 ```
---model <model>    Override Claude model (default: claude-sonnet-4-20250514)
+--model <model>    Override Claude model (default: claude-sonnet-4-6)
 --dry-run          Print system prompt without calling API
 --fresh            Ignore existing output file, start from scratch
 ```
@@ -110,7 +116,7 @@ The interview engine sends prompt templates as Claude's system message. Claude d
 ```
 ┌─────────────────────────────┐
 │  CLI Layer (Commander.js)   │
-│  20 commands                │
+│  24 commands                │
 └──────────┬──────────────────┘
            │
 ┌──────────▼──────────────────┐
