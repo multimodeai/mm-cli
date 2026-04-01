@@ -25,7 +25,7 @@ PHASE 2 — INTERVIEW (2-3 focused questions)
 Based on what you found in the codebase, ask the user:
 - What specific tasks should this skill handle? (Give examples you found in the code)
 - What patterns or conventions does the user want enforced?
-- What are the failure modes — what should the AI NOT do in this domain?
+- Based on what you found in the code, identify which of the six named failure patterns apply to this skill's domain (context degradation, specification drift, sycophantic confirmation, tool selection errors, cascade failure, silent failure). Present your analysis to the user and ask them to confirm or add domain-specific failure modes.
 - Are there specific files, modules, or APIs the skill should reference?
 
 Keep it short. You already read the code — don't ask questions you can answer yourself.
