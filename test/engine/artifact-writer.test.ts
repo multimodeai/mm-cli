@@ -206,6 +206,45 @@ Let me know if you want changes.`;
     expect(result).not.toContain('Let me know');
   });
 
+  it('preserves all sections when artifact is split across multiple ```text blocks', () => {
+    // Regression: spec was being truncated to just the longest section because
+    // each section was emitted as its own ```text fenced block.
+    const section = (n: number, name: string, lineCount: number) =>
+      `\`\`\`text\n${n}. ${name}\n${Array.from({ length: lineCount }, (_, i) => `Detail line ${i} for section ${n}.`).join('\n')}\n\`\`\``;
+
+    const response = `Here is the spec.
+
+${section(1, 'OVERVIEW', 30)}
+
+---
+
+${section(2, 'ACCEPTANCE CRITERIA', 80)}
+
+---
+
+${section(3, 'CONSTRAINTS', 60)}
+
+---
+
+${section(4, 'TASK DECOMPOSITION', 200)}
+
+---
+
+${section(8, 'DEFINITION OF DONE', 20)}
+
+**SPECIFICATION QUALITY CHECK:**
+Trailing notes that should be kept.`;
+
+    const result = extractArtifact(response);
+    expect(result).toContain('1. OVERVIEW');
+    expect(result).toContain('2. ACCEPTANCE CRITERIA');
+    expect(result).toContain('3. CONSTRAINTS');
+    expect(result).toContain('4. TASK DECOMPOSITION');
+    expect(result).toContain('8. DEFINITION OF DONE');
+    expect(result).toContain('SPECIFICATION QUALITY CHECK');
+    expect(result.trimStart()).not.toMatch(/^4\. TASK DECOMPOSITION/);
+  });
+
   it('ignores small code blocks that are just examples', () => {
     const response = `Use this command:
 

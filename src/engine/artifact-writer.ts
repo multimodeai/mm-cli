@@ -25,6 +25,17 @@ export function extractArtifact(response: string): string {
 
   if (blocks.length === 0) return response;
 
+  // Multi-block artifacts: when the response contains multiple substantial fenced
+  // blocks (e.g. a spec where each section is its own ```text block separated by
+  // horizontal rules), the artifact spans ALL of them. Picking one would silently
+  // discard the rest.
+  const substantialBlocks = blocks.filter(
+    b => b.length > response.length * 0.05 || b.split('\n').length > 15
+  );
+  if (substantialBlocks.length >= 2) {
+    return extractMultiBlockArtifact(response);
+  }
+
   // Find the block that looks most like a complete artifact:
   // prefer blocks with YAML frontmatter (---), then longest block.
   // But only extract a block if it's a substantial portion of the response —
@@ -180,6 +191,55 @@ function parseFencedBlocks(text: string): string[] {
   }
 
   return blocks;
+}
+
+/**
+ * For responses where the artifact is split across multiple fenced blocks
+ * (e.g. a spec rendered as ```text Section 1``` --- ```text Section 2``` ...),
+ * preserve everything from the first fence line to the last non-conversational
+ * line. Conversational pre/post is anything before the first ``` and after the
+ * last ``` that looks like chat ("Let me know", "Would you like", etc.).
+ */
+function extractMultiBlockArtifact(response: string): string {
+  const lines = response.split('\n');
+
+  let firstFence = -1;
+  let lastFence = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^```\w*\s*$/.test(lines[i].trim())) {
+      if (firstFence === -1) firstFence = i;
+      lastFence = i;
+    }
+  }
+
+  if (firstFence === -1) return response.trim() + '\n';
+
+  // Keep trailing post-fence content (e.g. "**SPECIFICATION QUALITY CHECK:**"
+  // sections that follow the last block) — that content is part of the artifact
+  // when the model formats output as multi-block + commentary blocks.
+  // Only strip the very last lines if they are clearly conversational chat.
+  let endIdx = lines.length - 1;
+  for (let i = lines.length - 1; i > lastFence; i--) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+    if (
+      trimmed.startsWith('Let me know') ||
+      trimmed.startsWith('Would you like') ||
+      trimmed.startsWith('Feel free') ||
+      trimmed.startsWith('Shall I') ||
+      trimmed.startsWith('Happy to')
+    ) {
+      endIdx = i - 1;
+    } else {
+      break;
+    }
+  }
+
+  while (endIdx > firstFence && !lines[endIdx].trim()) {
+    endIdx--;
+  }
+
+  return lines.slice(firstFence, endIdx + 1).join('\n').trim() + '\n';
 }
 
 /**
