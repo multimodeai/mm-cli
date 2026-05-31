@@ -5,7 +5,7 @@ import { isOAuthToken } from '../../src/util/config.js';
 describe('ClaudeClient', () => {
   it('initializes with default model', () => {
     const client = new ClaudeClient({ apiKey: 'test-key' });
-    expect(client.getModel()).toBe('claude-sonnet-4-20250514');
+    expect(client.getModel()).toBe('claude-sonnet-4-6');
   });
 
   it('accepts custom model', () => {
@@ -15,12 +15,12 @@ describe('ClaudeClient', () => {
 
   it('initializes with OAuth token (sk-ant-oat prefix)', () => {
     const client = new ClaudeClient({ apiKey: 'sk-ant-oat-test-token' });
-    expect(client.getModel()).toBe('claude-sonnet-4-20250514');
+    expect(client.getModel()).toBe('claude-sonnet-4-6');
   });
 
   it('initializes with API key (non-OAuth)', () => {
     const client = new ClaudeClient({ apiKey: 'sk-ant-api03-test-key' });
-    expect(client.getModel()).toBe('claude-sonnet-4-20250514');
+    expect(client.getModel()).toBe('claude-sonnet-4-6');
   });
 });
 

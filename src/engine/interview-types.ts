@@ -24,6 +24,8 @@ export interface InterviewConfig {
    * per phase. The user is only prompted after all discovery phases finish.
    */
   discoveryPhases?: string[];
+  /** Literal first line of the artifact (e.g. '=== PROJECT SPECIFICATION ==='). When set, extractArtifact uses signature-anchored extraction before heuristics. */
+  artifactStartMarker?: string;
 }
 
 export interface Message {

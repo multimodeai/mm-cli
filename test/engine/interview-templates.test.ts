@@ -141,8 +141,8 @@ describe('Interview Templates', () => {
     expect(SKILL_AUDIT.enableTools).toBeFalsy();
   });
 
-  it('TEMPLATES registry has all 18 templates', () => {
-    expect(Object.keys(TEMPLATES)).toHaveLength(18);
+  it('TEMPLATES registry has all 19 templates', () => {
+    expect(Object.keys(TEMPLATES)).toHaveLength(19);
     expect(TEMPLATES['diagnose-quick']).toBe(DIAGNOSE_QUICK);
     expect(TEMPLATES['diagnose-deep']).toBe(DIAGNOSE_DEEP);
     expect(TEMPLATES['rewrite']).toBe(REWRITE);

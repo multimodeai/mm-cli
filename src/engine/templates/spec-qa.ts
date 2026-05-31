@@ -209,6 +209,7 @@ A complete QA specification that guarantees 100% coverage of the testable surfac
   ],
   outputFile: 'QA-SPEC.md',
   enableTools: true,
+  artifactStartMarker: '=== QA SPECIFICATION ===',
   discoveryPhases: [
     // Phase 1A is handled by the initial greeting turn.
     // These are auto-sent after that, each getting its own tool budget.

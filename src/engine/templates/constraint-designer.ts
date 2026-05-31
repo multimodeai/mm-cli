@@ -110,4 +110,5 @@ Keep the document concise — aim for the CLAUDE.md standard: if removing a line
   ],
   outputFile: 'constraints/',
   enableTools: true,
+  artifactStartMarker: '=== CONSTRAINT ARCHITECTURE ===',
 };

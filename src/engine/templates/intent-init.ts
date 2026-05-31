@@ -124,4 +124,5 @@ The framework should surface implicit rules and make them explicit — if it onl
   ],
   outputFile: 'INTENT.md',
   enableTools: true,
+  artifactStartMarker: '=== DELEGATION & INTENT FRAMEWORK ===',
 };

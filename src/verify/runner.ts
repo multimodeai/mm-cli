@@ -283,15 +283,51 @@ function loadEvidenceFile(specFile: string): string | null {
 
 /**
  * Extract JSON from a response that might contain markdown code fences or extra text.
+ *
+ * Returns ordered candidates to try with JSON.parse. The model may emit:
+ *   1. A ```json fenced block, with possibly other ``` fences in surrounding prose
+ *   2. A bare JSON object, with prose around it
+ *   3. Raw JSON only
+ * The previous non-greedy single-strategy approach silently closed at the first
+ * `\`\`\`` in prose when discussing embedded fences, truncating the JSON.
+ */
+function extractJsonCandidates(text: string): string[] {
+  const candidates: string[] = [];
+
+  // Strategy 1: ```json ... ``` with the LAST ``` in the response treated as the close.
+  // This handles the case where prose before the JSON discusses other triple-backticks.
+  const tagged = text.match(/```json\s*\n([\s\S]*)\n```/);
+  if (tagged) candidates.push(tagged[1].trim());
+
+  // Strategy 2: lazy ```json ... ``` (closes at first ``` after open).
+  const taggedLazy = text.match(/```json\s*\n([\s\S]*?)\n```/);
+  if (taggedLazy) candidates.push(taggedLazy[1].trim());
+
+  // Strategy 3: any code fence with greedy close.
+  const anyFence = text.match(/```(?:\w+)?\s*\n([\s\S]*)\n```/);
+  if (anyFence) candidates.push(anyFence[1].trim());
+
+  // Strategy 4: bare `{ ... }` greedy.
+  const bare = text.match(/\{[\s\S]*\}/);
+  if (bare) candidates.push(bare[0]);
+
+  // Strategy 5: raw text.
+  candidates.push(text.trim());
+
+  // Dedupe while preserving order
+  const seen = new Set<string>();
+  return candidates.filter(c => {
+    if (seen.has(c)) return false;
+    seen.add(c);
+    return true;
+  });
+}
+
+/**
+ * Backward-compat single-string entry point — returns the first candidate.
  */
 function extractJson(text: string): string {
-  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-  if (fenceMatch) return fenceMatch[1].trim();
-
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (jsonMatch) return jsonMatch[0];
-
-  return text.trim();
+  return extractJsonCandidates(text)[0];
 }
 
 export async function runSpecVerify(
@@ -348,8 +384,23 @@ export async function runSpecVerify(
   const timestamp = new Date().toISOString();
   const model = client.getModel();
 
+  // Try each candidate JSON extraction strategy until one parses cleanly.
+  const candidates = extractJsonCandidates(result.text);
+  let parsed: any = null;
+  let lastErr: unknown = null;
+  for (const candidate of candidates) {
+    try {
+      parsed = JSON.parse(candidate);
+      break;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
   try {
-    const parsed = JSON.parse(extractJson(result.text));
+    if (!parsed) {
+      throw lastErr instanceof Error ? lastErr : new Error('No JSON candidate parsed');
+    }
 
     const resultCriteria: VerifyCriterion[] = (parsed.criteria || []).map((c: any) => ({
       criterion: c.criterion || '',
@@ -411,15 +462,30 @@ export async function runSpecVerify(
         score,
       },
     };
-  } catch {
-    // Fallback if JSON parsing fails
+  } catch (err) {
+    // Fallback if JSON parsing fails — surface the raw response so the user
+    // can diagnose. The catch swallowed too much silently in earlier versions.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const preview = result.text.slice(0, 4000);
+    const tail = result.text.length > 4000 ? `\n\n…(truncated, total ${result.text.length} chars)` : '';
+    // Best-effort: save raw text + candidates to /tmp for offline diagnosis.
+    try {
+      const dumpPath = `/tmp/mm-verify-raw-${Date.now()}.txt`;
+      const dump = `=== RAW MODEL RESPONSE (${result.text.length} chars) ===\n${result.text}\n\n=== CANDIDATES (${candidates.length}) ===\n${candidates.map((c, i) => `--- candidate ${i} (${c.length} chars) ---\n${c}`).join('\n\n')}`;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('node:fs').writeFileSync(dumpPath, dump, 'utf-8');
+      console.log(`  ⓘ Raw response saved to ${dumpPath}`);
+    } catch { /* best-effort */ }
     return {
       specFile,
       timestamp,
       model,
       criteria: [],
       constraints: [],
-      definitionOfDone: { met: false, reasoning: 'Failed to parse verification response' },
+      definitionOfDone: {
+        met: false,
+        reasoning: `Failed to parse verification response: ${errMsg}\n\nRAW RESPONSE PREVIEW:\n${preview}${tail}`,
+      },
       summary: {
         totalCriteria: 0,
         met: 0,

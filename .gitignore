@@ -13,3 +13,11 @@ drafts/
 archive/
 published/
 docs/
+
+# Personal tooling — operates only on gitignored dirs (drafts/, docs/)
+scripts/
+
+# Editor / OS junk
+.vscode/
+.DS_Store
+**/.DS_Store

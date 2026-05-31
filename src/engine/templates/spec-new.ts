@@ -154,4 +154,5 @@ Typical length: 800-2,000 words depending on project complexity.
   ],
   outputFile: 'SPEC.md',
   enableTools: true,
+  artifactStartMarker: '=== PROJECT SPECIFICATION ===',
 };

@@ -9,8 +9,25 @@ import chalk from 'chalk';
  *
  * Handles nested code fences (e.g. SKILL.md containing ```python blocks)
  * by parsing line-by-line and tracking fence depth.
+ *
+ * When `startMarker` is provided, the signature-anchored path runs FIRST: if a
+ * line whose trimmed text equals the marker exists outside any code fence,
+ * the artifact is sliced from that line to the end (minus trailing chat).
+ * Heuristic fallback only runs when the marker is absent or unmatched.
  */
-export function extractArtifact(response: string): string {
+export function extractArtifact(response: string, startMarker?: string): string {
+  // Signature-anchored path — runs BEFORE heuristics. The template declares
+  // the literal first line of its artifact; we find it outside any fence and
+  // slice forward. This eliminates the failure mode where extractTaggedBlock
+  // matches an embedded ```markdown example mid-document.
+  if (startMarker) {
+    const markerIdx = findUnfencedLine(response, startMarker);
+    if (markerIdx >= 0) {
+      const sliced = response.split('\n').slice(markerIdx).join('\n');
+      return stripCommentary(sliced);
+    }
+  }
+
   // Fast path: if the response contains a tagged markdown fence (```markdown or ```md),
   // extract from the opening tag to the LAST bare ``` in the response.
   // This avoids the complex nested-fence parsing which fails when the artifact
@@ -56,6 +73,30 @@ export function extractArtifact(response: string): string {
 
   // No code fence wrapping — strip leading/trailing conversational text
   return stripCommentary(response);
+}
+
+/**
+ * Find the index of the first line whose trimmed text exactly equals `marker`
+ * AND is not inside any ``` fence block. Returns -1 if no such line exists.
+ *
+ * Fence tracking is a single boolean toggle on any line starting with ``` —
+ * intentionally simpler than parseFencedBlocks' depth tracking, because the
+ * only question here is "is this line inside ANY fence".
+ */
+function findUnfencedLine(text: string, marker: string): number {
+  const lines = text.split('\n');
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence && trimmed === marker) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -322,11 +363,11 @@ function isStructuralLine(line: string): boolean {
   );
 }
 
-export function writeArtifact(filePath: string, content: string): void {
+export function writeArtifact(filePath: string, content: string, startMarker?: string): void {
   const dir = dirname(filePath);
   mkdirSync(dir, { recursive: true });
 
-  let extracted = extractArtifact(content);
+  let extracted = extractArtifact(content, startMarker);
 
   // For YAML files, strip trailing non-YAML commentary (e.g. "COMPLETENESS CHECK: ...")
   if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {

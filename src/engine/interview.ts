@@ -126,7 +126,7 @@ export async function runInterview(
     // For one-shot commands (e.g. audit), the response to initialInput IS the final artifact
     if (isLikelyComplete(greeting, config)) {
       if (options.outputFile) {
-        writeArtifact(options.outputFile, greeting);
+        writeArtifact(options.outputFile, greeting, config.artifactStartMarker);
         saved = true;
         savedContent = greeting;
       }
@@ -258,7 +258,7 @@ export async function runInterview(
     if (isLikelyComplete(response, config)) {
       // 1. Auto-save immediately — artifact is on disk before any follow-up
       if (options.outputFile) {
-        writeArtifact(options.outputFile, response);
+        writeArtifact(options.outputFile, response, config.artifactStartMarker);
         saved = true;
         savedContent = response;
       }
@@ -276,13 +276,13 @@ export async function runInterview(
 
   // If user refined during follow-up, re-save with latest content
   if (options.outputFile && saved && artifact && artifact !== savedContent) {
-    writeArtifact(options.outputFile, artifact);
+    writeArtifact(options.outputFile, artifact, config.artifactStartMarker);
   }
 
   // Interrupted = cancel. Never save on Ctrl-C.
   // Only save if the interview completed normally and wasn't already saved by completion detection.
   if (options.outputFile && !saved && artifact && !interrupted) {
-    writeArtifact(options.outputFile, artifact);
+    writeArtifact(options.outputFile, artifact, config.artifactStartMarker);
   }
 
   return {
