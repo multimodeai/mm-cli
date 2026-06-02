@@ -10,21 +10,25 @@ import chalk from 'chalk';
  * Handles nested code fences (e.g. SKILL.md containing ```python blocks)
  * by parsing line-by-line and tracking fence depth.
  *
- * When `startMarker` is provided, the signature-anchored path runs FIRST: if a
- * line whose trimmed text equals the marker exists outside any code fence,
- * the artifact is sliced from that line to the end (minus trailing chat).
- * Heuristic fallback only runs when the marker is absent or unmatched.
+ * When `startMarker` is provided, the marker-anchored path runs FIRST and is
+ * fence-AGNOSTIC: the artifact is contiguous from the first line whose trimmed
+ * text equals the marker to the end of the message. No fence reconstruction is
+ * involved — the boundary is declared, not guessed. Heuristic fallback (which
+ * DOES guess from fences, and historically truncated long specs) only runs when
+ * the marker is absent or unmatched.
  */
 export function extractArtifact(response: string, startMarker?: string): string {
-  // Signature-anchored path — runs BEFORE heuristics. The template declares
-  // the literal first line of its artifact; we find it outside any fence and
-  // slice forward. This eliminates the failure mode where extractTaggedBlock
-  // matches an embedded ```markdown example mid-document.
+  // Marker-anchored path — runs BEFORE any heuristic. The template declares the
+  // literal first line of its artifact. We find that line ignoring fence state
+  // (the marker is unique; it never appears inside legitimate code) and take
+  // [marker .. end-of-message]. We do NOT call parseFencedBlocks /
+  // extractTaggedBlock / extractMultiBlockArtifact here — those guess the end
+  // from the last code fence and drop every fence-free trailing section
+  // (a spec's §5–§8 + footer). See docs/BUG_artifact-truncation.md.
   if (startMarker) {
-    const markerIdx = findUnfencedLine(response, startMarker);
+    const markerIdx = findMarkerLine(response, startMarker);
     if (markerIdx >= 0) {
-      const sliced = response.split('\n').slice(markerIdx).join('\n');
-      return stripCommentary(sliced);
+      return extractFromMarker(response, markerIdx);
     }
   }
 
@@ -76,27 +80,85 @@ export function extractArtifact(response: string, startMarker?: string): string 
 }
 
 /**
- * Find the index of the first line whose trimmed text exactly equals `marker`
- * AND is not inside any ``` fence block. Returns -1 if no such line exists.
+ * Find the index of the FIRST line whose trimmed text exactly equals `marker`.
+ * Returns -1 if no such line exists.
  *
- * Fence tracking is a single boolean toggle on any line starting with ``` —
- * intentionally simpler than parseFencedBlocks' depth tracking, because the
- * only question here is "is this line inside ANY fence".
+ * This is deliberately FENCE-AGNOSTIC. The previous implementation tracked
+ * "am I inside a fence?" with a single boolean toggled by any ``` line — which
+ * could not distinguish an opening ```lang from a closing ```. A ```text
+ * wrapper around the title block (the model is instructed to wrap blocks in
+ * language-tagged fences, interview.ts:303) flipped that boolean over the
+ * marker line, so the marker was judged "inside a fence", skipped, and the
+ * whole marker-anchored path was abandoned — falling back into the heuristic
+ * parsers that truncate long specs. The marker (e.g. `=== PROJECT
+ * SPECIFICATION ===`) is unique and never appears inside legitimate code, so
+ * the first exact line match is unambiguously the artifact start.
  */
-function findUnfencedLine(text: string, marker: string): number {
+function findMarkerLine(text: string, marker: string): number {
   const lines = text.split('\n');
-  let inFence = false;
   for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed.startsWith('```')) {
-      inFence = !inFence;
-      continue;
-    }
-    if (!inFence && trimmed === marker) {
+    if (lines[i].trim() === marker) {
       return i;
     }
   }
   return -1;
+}
+
+/**
+ * Extract a marker-declared artifact: take [markerLine .. end-of-message]
+ * verbatim and trim ONLY the wrapper and trailing chat. The artifact is
+ * contiguous — the middle is never sliced.
+ *
+ * Two trims, both at the edges:
+ *   (a) Wrapper: when the model wraps the title block in a language-tagged
+ *       fence (```text\n=== MARKER ===\n...\n```), the opening fence sits
+ *       immediately before the marker (dropped by starting AT the marker) and
+ *       its matching bare ``` closer sits just after the title block. Remove
+ *       that orphaned closer.
+ *   (b) Trailing conversational chat ("Let me know if you want changes", etc.).
+ */
+function extractFromMarker(response: string, markerIdx: number): string {
+  const lines = response.split('\n');
+  const start = markerIdx;
+  let end = lines.length - 1;
+
+  // (a) Drop the orphaned wrapper-close. If the line immediately before the
+  // marker is an opening language-tagged fence, the wrapper's matching closer
+  // is the first bare ``` after the marker (a title block contains no nested
+  // fences). Starting at the marker already drops the opening fence line.
+  if (markerIdx > 0 && /^```\S+$/.test(lines[markerIdx - 1].trim())) {
+    for (let i = markerIdx + 1; i <= end; i++) {
+      if (lines[i].trim() === '```') {
+        lines.splice(i, 1);
+        end--;
+        break;
+      }
+    }
+  }
+
+  // (b) Strip trailing blank lines and conversational chat.
+  while (end > start && (!lines[end].trim() || isTrailingChat(lines[end].trim()))) {
+    end--;
+  }
+
+  return lines.slice(start, end + 1).join('\n').trim() + '\n';
+}
+
+/**
+ * Whether a (trimmed) line is post-artifact conversational chat. Shared by the
+ * marker path, extractMultiBlockArtifact, and stripCommentary so the tail rules
+ * stay in one place.
+ */
+function isTrailingChat(trimmed: string): boolean {
+  return (
+    trimmed.startsWith('Let me know') ||
+    trimmed.startsWith('Would you like') ||
+    trimmed.startsWith('Feel free') ||
+    trimmed.startsWith('I can ') ||
+    trimmed.startsWith('Shall I') ||
+    trimmed.startsWith('If you') ||
+    trimmed.startsWith('Happy to')
+  );
 }
 
 /**
@@ -235,48 +297,34 @@ function parseFencedBlocks(text: string): string[] {
 }
 
 /**
- * For responses where the artifact is split across multiple fenced blocks
- * (e.g. a spec rendered as ```text Section 1``` --- ```text Section 2``` ...),
- * preserve everything from the first fence line to the last non-conversational
- * line. Conversational pre/post is anything before the first ``` and after the
- * last ``` that looks like chat ("Let me know", "Would you like", etc.).
+ * No-marker fallback for responses where the artifact is split across multiple
+ * fenced blocks (e.g. a spec rendered as ```text Section 1``` --- ```text
+ * Section 2``` ...). Preserve everything from the first fence line to the last
+ * non-conversational line.
+ *
+ * The end is anchored to END-OF-MESSAGE (last non-chat line), NOT the last code
+ * fence. Anchoring to the last fence drops every fence-free trailing section
+ * (a spec's §5–§8 + footer live after the last embedded code block). See
+ * docs/BUG_artifact-truncation.md.
  */
 function extractMultiBlockArtifact(response: string): string {
   const lines = response.split('\n');
 
   let firstFence = -1;
-  let lastFence = -1;
   for (let i = 0; i < lines.length; i++) {
     if (/^```\w*\s*$/.test(lines[i].trim())) {
-      if (firstFence === -1) firstFence = i;
-      lastFence = i;
+      firstFence = i;
+      break;
     }
   }
 
   if (firstFence === -1) return response.trim() + '\n';
 
-  // Keep trailing post-fence content (e.g. "**SPECIFICATION QUALITY CHECK:**"
-  // sections that follow the last block) — that content is part of the artifact
-  // when the model formats output as multi-block + commentary blocks.
-  // Only strip the very last lines if they are clearly conversational chat.
+  // Walk back from end-of-message over trailing blank/chat lines only. Any
+  // real content after the last fence (prose sections, quality-check blocks) is
+  // part of the artifact and must survive.
   let endIdx = lines.length - 1;
-  for (let i = lines.length - 1; i > lastFence; i--) {
-    const trimmed = lines[i].trim();
-    if (!trimmed) continue;
-    if (
-      trimmed.startsWith('Let me know') ||
-      trimmed.startsWith('Would you like') ||
-      trimmed.startsWith('Feel free') ||
-      trimmed.startsWith('Shall I') ||
-      trimmed.startsWith('Happy to')
-    ) {
-      endIdx = i - 1;
-    } else {
-      break;
-    }
-  }
-
-  while (endIdx > firstFence && !lines[endIdx].trim()) {
+  while (endIdx > firstFence && (!lines[endIdx].trim() || isTrailingChat(lines[endIdx].trim()))) {
     endIdx--;
   }
 
@@ -321,16 +369,7 @@ function stripCommentary(response: string): string {
     const trimmed = lines[i].trim();
     if (!trimmed) continue; // skip blank lines
 
-    // These patterns indicate post-artifact commentary
-    if (
-      trimmed.startsWith('Let me know') ||
-      trimmed.startsWith('Would you like') ||
-      trimmed.startsWith('Feel free') ||
-      trimmed.startsWith('I can ') ||
-      trimmed.startsWith('Shall I') ||
-      trimmed.startsWith('If you') ||
-      trimmed.startsWith('Happy to')
-    ) {
+    if (isTrailingChat(trimmed)) {
       endIdx = i - 1;
     } else {
       break;

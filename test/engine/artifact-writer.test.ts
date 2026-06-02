@@ -327,23 +327,34 @@ Let me know if you want me to adjust anything.`;
     expect(result).not.toContain('Let me know if you want me to adjust');
   });
 
-  it('falls back to heuristics when marker is only inside a fence', () => {
-    // The marker exists in the response but is inside a ```markdown example
-    // block. findUnfencedLine must NOT match it — heuristic fallback runs.
-    // Verifying the fallback ran means: with-marker output equals legacy
-    // (no-marker) output, byte-for-byte.
-    const response = `Here's an example of what a project spec looks like:
+  it('matches the marker fence-AGNOSTICALLY when wrapped in a ```text/```markdown fence', () => {
+    // Contract change (2026-06-01): the marker path is now fence-agnostic. The
+    // real spec failure had `=== PROJECT SPECIFICATION ===` wrapped in a ```text
+    // title block (interview.ts:303 instructs the model to language-tag every
+    // fence). The OLD findUnfencedLine treated that wrapper as "marker inside a
+    // fence" and abandoned the marker path, falling into the heuristic parsers
+    // that truncate long specs. The marker is unique and never appears inside
+    // legitimate code, so the first exact match IS the artifact start, wrapper
+    // and all. See docs/BUG_artifact-truncation.md.
+    const response = `Here's the spec:
 
-\`\`\`markdown
+\`\`\`text
 === PROJECT SPECIFICATION ===
 Project: example
 \`\`\`
 
-Anyway, that's just for reference.`;
+1. OVERVIEW
+A real document body that follows the wrapped title block.`;
 
-    const withMarker = extractArtifact(response, MARKER);
-    const legacy = extractArtifact(response);
-    expect(withMarker).toBe(legacy);
+    const result = extractArtifact(response, MARKER);
+    // Output starts at the marker; the ```text wrapper (open + bare ``` close)
+    // and the leading chat preamble are stripped.
+    expect(result.startsWith(MARKER)).toBe(true);
+    expect(result).not.toContain('```');
+    expect(result).not.toContain("Here's the spec");
+    // Body after the wrapper is preserved (never sliced at the fence).
+    expect(result).toContain('1. OVERVIEW');
+    expect(result).toContain('A real document body');
   });
 
   it('preserves legacy behavior when marker is absent (no third arg)', () => {
