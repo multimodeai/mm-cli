@@ -2,6 +2,10 @@
 
 Project instructions for Claude Code when building mm-cli.
 
+## ⛔ Rule 0 — the global "verify before acting" rule, applied to mm's evals
+
+When a source could push you toward *"to do X right we need our own experiment/benchmark"* — STOP and read it first to confirm it is a **real experiment with numbers**, not a qualitative essay. Distinguish what a source **claims** from what it **measured**. Reading cost ~2 min; assuming cost a full day (2026-06-24, the Vercel non-experiment).
+
 ## Project Overview
 
 mm-cli — a developer tool that operationalizes the 4 disciplines of AI input (Prompt Craft, Context Engineering, Intent Engineering, Specification Engineering) with measurable eval outcomes. 20 CLI commands mapping to the full prompt kit.

@@ -3,9 +3,10 @@ import type { EvalScenario, ScenarioResult, ManifoldScore } from './types.js';
 
 /**
  * Score a scenario response using Claude-as-judge.
- * Two scoring passes:
+ * Three scoring passes:
  * 1. Quality checkbox scoring (expected_qualities + failure_modes)
  * 2. Multi-axis 5-dim scoring (if constraint_change present)
+ * 3. Canary check (VOID-rule semantics, if canary_qualities present)
  */
 export async function scoreScenario(
   scenario: EvalScenario,
@@ -24,13 +25,86 @@ export async function scoreScenario(
     manifoldTotal = Object.values(manifoldScore).reduce((a, b) => a + b, 0);
   }
 
+  // Canary VOID-rule check
+  let canaryChecks: { canary: string; met: boolean; reason: string }[] | undefined;
+  let isVoid = false;
+  let voidReason: string | undefined;
+  if (scenario.canary_qualities && scenario.canary_qualities.length > 0) {
+    canaryChecks = await scoreCanaries(scenario, response, judgeClient);
+    const missed = canaryChecks.filter(c => !c.met);
+    if (missed.length > 0) {
+      isVoid = true;
+      voidReason = `${missed.length} of ${canaryChecks.length} canary qualities missed: ${missed.map(m => m.canary.slice(0, 60)).join(' | ')}`;
+    }
+  }
+
   return {
     scenario: scenario.name,
     response,
     ...qualityResult,
     manifoldScore,
     manifoldTotal,
+    canaryChecks,
+    isVoid,
+    voidReason,
   };
+}
+
+/**
+ * Score canary qualities against the response. Each canary is a binary check;
+ * the VOID rule fires if any canary is missed (handled in the caller).
+ */
+async function scoreCanaries(
+  scenario: EvalScenario,
+  response: string,
+  judgeClient: ClaudeClient
+): Promise<{ canary: string; met: boolean; reason: string }[]> {
+  const canaries = scenario.canary_qualities!;
+  const canaryList = canaries.map((c, i) => `${i + 1}. ${c}`).join('\n');
+
+  const judgePrompt = `You are an eval judge checking CANARY qualities. A canary is a material fact a careful analyst should find — its absence VOIDS the run, not just reduces the score.
+
+SCENARIO: ${scenario.name}
+PROMPT GIVEN: ${scenario.prompt}
+
+RESPONSE TO EVALUATE:
+${response}
+
+CANARY QUALITIES (each is a hard requirement — missing ANY voids the run):
+${canaryList}
+
+Be strict. Only mark "met: true" if the response demonstrates the canary fact clearly and unambiguously. Vague references or implicit treatment = not met.
+
+IMPORTANT: The response may contain (a) tool-exploration text where the model investigates source files, and (b) the actual deliverable text the model produced. A canary is ONLY met if the evidence appears in (b) — the produced deliverable. Mere mentions during exploration ('I see EVT-001 in the audit_log...') without inclusion in the produced deliverable do NOT count as met.
+
+Respond in this exact JSON format (no markdown, no code fences):
+{
+  "canaries": [
+    {"canary": "...", "met": true/false, "reason": "one sentence with evidence"}
+  ]
+}`;
+
+  const judgeResponse = await judgeClient.send(
+    'You are a precise canary check judge. Respond only with valid JSON. Be strict — canaries are hard requirements.',
+    [{ role: 'user', content: judgePrompt }],
+    8192
+  );
+
+  try {
+    const parsed = JSON.parse(extractJson(judgeResponse));
+    return parsed.canaries.map((c: any) => ({
+      canary: c.canary,
+      met: c.met,
+      reason: c.reason,
+    }));
+  } catch {
+    // Parse failure → mark all canaries as missed (defensive: better VOID than false-positive pass)
+    return canaries.map(c => ({
+      canary: c,
+      met: false,
+      reason: 'Judge response parse error — defaulting to missed (defensive VOID)',
+    }));
+  }
 }
 
 async function scoreQuality(
@@ -46,9 +120,11 @@ async function scoreQuality(
     .map((q, i) => `${i + 1}. ${q}`)
     .join('\n');
 
-  const failuresList = scenario.failure_modes
-    .map((f, i) => `${i + 1}. ${f}`)
-    .join('\n');
+  // failure_modes is optional in practice — workflow-generated eval suites may omit it
+  const failureModes = scenario.failure_modes ?? [];
+  const failuresList = failureModes.length === 0
+    ? '(none specified — score on qualities alone)'
+    : failureModes.map((f, i) => `${i + 1}. ${f}`).join('\n');
 
   const judgePrompt = `You are an eval judge. Score the following AI response against quality criteria and failure modes.
 
@@ -78,7 +154,7 @@ Respond in this exact JSON format (no markdown, no code fences):
   const judgeResponse = await judgeClient.send(
     'You are a precise eval judge. Respond only with valid JSON.',
     [{ role: 'user', content: judgePrompt }],
-    2048
+    8192
   );
 
   try {
@@ -106,7 +182,7 @@ Respond in this exact JSON format (no markdown, no code fences):
       qualityDetails: scenario.expected_qualities.map(q => ({
         quality: q, met: false, reason: 'Judge response parse error',
       })),
-      failureModeHits: scenario.failure_modes.map(f => ({
+      failureModeHits: (scenario.failure_modes ?? []).map(f => ({
         mode: f, hit: false, reason: 'Judge response parse error',
       })),
     };

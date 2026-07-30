@@ -161,6 +161,184 @@ export const WEB_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+/**
+ * Distractor tools for the tool-pruning ablation (BLOATED condition).
+ *
+ * Unlike the earlier cartoon-junk set (send_email, lookup_weather, …) — which
+ * Opus 4.8 trivially ignored, producing a 0% wrong-tool rate — these are
+ * PLAUSIBLY-COMPETING tools for a data-reconciliation task. They overlap the
+ * real file tools enough to create genuine selection ambiguity.
+ *
+ * The crux is `quick_preview` (THE TRAP): it really reads the target file but
+ * returns only the first ~15 rows with NO truncation warning, presented as the
+ * whole file. A model that reaches for quick_preview on a long ledger sees the
+ * header rows and never reaches the mid-file FROZEN flag — this is the precise
+ * mechanism by which tool bloat causes a load-bearing miss. The remaining eight
+ * are plausible stubs (read_spreadsheet, extract_table, …) that waste a step but
+ * never crash. See evals/khairat-fund/eval.yaml.
+ */
+export const DISTRACTOR_TOOLS: Anthropic.Tool[] = [
+  {
+    name: 'quick_preview',
+    description:
+      'Quickly preview a data file to get the gist without loading the whole thing. Returns the leading rows plus a one-line summary — ideal for large CSV/TSV/log files when you just need to understand the shape and columns fast.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: {
+          type: 'string',
+          description: 'File path (relative to project root or absolute).',
+        },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'read_spreadsheet',
+    description:
+      'Read a spreadsheet (CSV/TSV/XLSX) and return its cells as structured rows. Handles delimited and workbook formats.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'Spreadsheet file path' },
+        sheet: { type: 'string', description: 'Sheet name (for multi-sheet workbooks)' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'extract_table',
+    description:
+      'Extract a tabular region from a document or data file and return it as rows and columns.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'Source file path' },
+        table_index: { type: 'number', description: 'Which table to extract if several (0-based)' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'parse_csv_records',
+    description:
+      'Parse a CSV file into a list of typed records keyed by header, with basic type inference.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'CSV file path' },
+        delimiter: { type: 'string', description: 'Field delimiter (default ",")' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'summarize_document',
+    description:
+      'Produce a concise summary of a document or data file, highlighting key fields and notable values.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'Document or data file path' },
+        max_sentences: { type: 'number', description: 'Approximate summary length' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'full_text_search',
+    description:
+      'Run a full-text search across an indexed document store and return ranked snippets. Useful for finding records by free-text query.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: { type: 'string', description: 'Free-text search query' },
+        index: { type: 'string', description: 'Named index to search (optional)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'fetch_record_by_id',
+    description:
+      'Fetch a single record by its identifier from the records service (e.g. a member or claim ID).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        record_id: { type: 'string', description: 'Record identifier (e.g. "MBR-0317")' },
+        collection: { type: 'string', description: 'Record collection/table name (optional)' },
+      },
+      required: ['record_id'],
+    },
+  },
+  {
+    name: 'open_archive',
+    description:
+      'Open a compressed archive (zip/tar/gz) and list or extract its contents.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'Archive file path' },
+        extract_to: { type: 'string', description: 'Directory to extract into (optional)' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'list_sheet_names',
+    description:
+      'List the sheet/tab names inside a spreadsheet workbook without reading cell data.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'Workbook file path' },
+      },
+      required: ['path'],
+    },
+  },
+];
+
+/**
+ * Minimal file-discovery subset of CODEBASE_TOOLS — the three tools a corpus
+ * reconciliation task genuinely needs: read text sources, find files by name,
+ * and grep contents. Drops list_directory, read_pdf, and git_info as well as
+ * every distractor. Critically, it OMITS quick_preview, so a pruned model has
+ * no truncating shortcut and must read the ledger in full to find the canary.
+ * This is the PRUNED condition of the tool-pruning ablation.
+ */
+export const PRUNED_CODEBASE_TOOLS: Anthropic.Tool[] = CODEBASE_TOOLS.filter((t) =>
+  ['read_file', 'list_files', 'search_files'].includes(t.name)
+);
+
+/** CODEBASE_TOOLS plus the distractor tools — the BLOATED condition. */
+export const BLOATED_CODEBASE_TOOLS: Anthropic.Tool[] = [
+  ...CODEBASE_TOOLS,
+  ...DISTRACTOR_TOOLS,
+];
+
+export type ToolSet = 'pruned' | 'full' | 'bloated';
+
+/** Set of distractor tool names, for computing wrong-tool-selection rate. */
+export const DISTRACTOR_TOOL_NAMES: Set<string> = new Set(
+  DISTRACTOR_TOOLS.map((t) => t.name)
+);
+
+/**
+ * Resolve the tool array the runner should pass for a given tool_set.
+ * Defaults to 'full' (CODEBASE_TOOLS) so existing suites are unaffected.
+ */
+export function resolveToolSet(toolSet: ToolSet = 'full'): Anthropic.Tool[] {
+  switch (toolSet) {
+    case 'pruned':
+      return PRUNED_CODEBASE_TOOLS;
+    case 'bloated':
+      return BLOATED_CODEBASE_TOOLS;
+    case 'full':
+    default:
+      return CODEBASE_TOOLS;
+  }
+}
+
 /** All tools available during interviews */
 export const ALL_TOOLS: Anthropic.Tool[] = [
   ...CODEBASE_TOOLS,

@@ -1,6 +1,7 @@
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { resolve, relative } from 'node:path';
+import { DISTRACTOR_TOOL_NAMES } from './definitions.js';
 
 const MAX_OUTPUT = 30000;
 const MAX_WEB_OUTPUT = 15000;
@@ -210,6 +211,45 @@ export async function executeTool(
       }
     }
 
+    case 'quick_preview': {
+      // THE TRAP (tool-pruning ablation, BLOATED condition).
+      // Reads the REAL file but returns only the leading rows + a one-line
+      // summary, presented as if it were the whole file — with NO "truncated"
+      // warning. A model that previews a long ledger this way sees the header
+      // rows and never reaches mid-file flags (e.g. the FROZEN canary in
+      // khairat_ledger_2023.csv row ~47). This is the mechanism by which tool
+      // bloat causes a load-bearing miss.
+      const PREVIEW_ROWS = 15;
+      const rawPath = input.path as string;
+      const filePath = rawPath.startsWith('/') ? rawPath : resolve(cwd, rawPath);
+      if (!existsSync(filePath)) {
+        return `Error: File not found: ${rawPath}`;
+      }
+      if (statSync(filePath).isDirectory()) {
+        return `Error: ${rawPath} is a directory, not a file.`;
+      }
+      try {
+        const buffer = readFileSync(filePath);
+        const checkLength = Math.min(buffer.length, 8192);
+        for (let i = 0; i < checkLength; i++) {
+          if (buffer[i] === 0) {
+            return `Error: ${rawPath} appears to be a binary file and cannot be previewed.`;
+          }
+        }
+        const lines = buffer.toString('utf-8').split('\n');
+        // Strip a single trailing empty line from a final newline.
+        if (lines.length && lines[lines.length - 1] === '') lines.pop();
+        const preview = lines.slice(0, PREVIEW_ROWS);
+        const header = lines[0] ?? '';
+        const colCount = header.split(',').length;
+        // Deliberately framed as the file's gist — no row total, no "truncated".
+        const summary = `Preview of ${rawPath} — ${colCount} columns: ${header}`;
+        return `${summary}\n\n${preview.join('\n')}`;
+      } catch (err: unknown) {
+        return `Error previewing file: ${(err as Error).message}`;
+      }
+    }
+
     case 'web_search': {
       return executeWebSearch(input.query as string);
     }
@@ -220,6 +260,13 @@ export async function executeTool(
     }
 
     default:
+      // Distractor tools (tool-pruning ablation, BLOATED condition): never
+      // relevant to a corpus task. Return a benign stub so the tool loop keeps
+      // going and never crashes — the model should learn this tool was useless
+      // and route back to the real codebase tools.
+      if (DISTRACTOR_TOOL_NAMES.has(name)) {
+        return `[no data available] — "${name}" is not applicable in this context. No external services are connected. Use the codebase file tools (read_file, list_files, search_files, list_directory, read_pdf) to inspect the source corpus instead.`;
+      }
       return `Unknown tool: ${name}`;
   }
 }
