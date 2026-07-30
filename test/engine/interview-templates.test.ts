@@ -67,13 +67,15 @@ describe('Interview Templates', () => {
     expect(CONTEXT_BUILD.phases).toHaveLength(7);
   });
 
-  it('SPEC_NEW has 3 phases and 7-section output', () => {
+  it('SPEC_NEW is one-shot (no interview phases) with 8-section output and noFollowUp', () => {
     validateTemplate(SPEC_NEW);
     expect(SPEC_NEW.systemPrompt).toContain('specification engineer');
-    expect(SPEC_NEW.systemPrompt).toContain('PROJECT INTAKE');
-    expect(SPEC_NEW.systemPrompt).toContain('DEEP INTERVIEW');
-    expect(SPEC_NEW.systemPrompt).toContain('SPECIFICATION DOCUMENT');
+    expect(SPEC_NEW.systemPrompt).toContain('ONE message');
+    expect(SPEC_NEW.systemPrompt).toContain('Do NOT ask clarifying questions');
+    expect(SPEC_NEW.systemPrompt).toContain('=== PROJECT SPECIFICATION ===');
     expect(SPEC_NEW.systemPrompt).toContain('8. DEFINITION OF DONE');
+    expect(SPEC_NEW.noFollowUp).toBe(true);
+    expect(SPEC_NEW.enableTools).toBe(true);
   });
 
   it('SPEC_QA has 5 discovery-first phases and coverage math constraint', () => {
