@@ -2,7 +2,7 @@ node_modules/
 dist/
 .env
 *.tsbuildinfo
-evals/*/results/
+evals/
 .mmrc
 STRATEGY.md
 specs/
@@ -21,3 +21,6 @@ scripts/
 .vscode/
 .DS_Store
 **/.DS_Store
+
+# lavish skill scratch (internal planning artifacts, mm-cli is a public repo)
+.lavish/
