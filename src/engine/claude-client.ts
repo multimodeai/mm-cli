@@ -3,9 +3,24 @@ import type { Message } from './interview-types.js';
 import { isOAuthToken } from '../util/config.js';
 import { executeTool } from './tools.js';
 
+export type EffortLevel = 'low' | 'medium' | 'high' | 'max' | 'ultracode';
+
+const EFFORT_BUDGETS: Record<EffortLevel, number | null> = {
+  low: null,
+  medium: null,
+  high: 16000,
+  max: 32000,
+  // ultracode = max thinking budget + workflow orchestration (orchestration handled
+  // externally via Claude Code Workflow tool; the result file is reformatted into
+  // mm-cli EvalResult shape by scripts/ultracode-to-evalresult.ts). At the single-call
+  // tier inside mm-cli, ultracode behaves identically to max.
+  ultracode: 32000,
+};
+
 export interface ClaudeClientOptions {
   apiKey: string;
   model?: string;
+  effort?: EffortLevel;
 }
 
 export interface ToolCall {
@@ -27,6 +42,7 @@ export class ClaudeClient {
   private client: Anthropic;
   private model: string;
   private usingOAuth: boolean;
+  private effort: EffortLevel;
 
   constructor(options: ClaudeClientOptions) {
     this.usingOAuth = isOAuthToken(options.apiKey);
@@ -45,6 +61,33 @@ export class ClaudeClient {
       this.client = new Anthropic({ apiKey: options.apiKey });
     }
     this.model = options.model || 'claude-sonnet-4-6';
+    this.effort = options.effort || 'medium';
+  }
+
+  /**
+   * Build the thinking parameter from the current effort level.
+   * low/medium → no thinking; high → 16k budget; max → 32k budget.
+   */
+  private buildThinking(): { type: 'enabled'; budget_tokens: number } | undefined {
+    const budget = EFFORT_BUDGETS[this.effort];
+    if (!budget) return undefined;
+    return { type: 'enabled', budget_tokens: budget };
+  }
+
+  /**
+   * Apply effort-derived thinking params + ensure max_tokens accommodates
+   * thinking budget + response headroom (~4k tokens). Mutates params in place
+   * and returns it for chaining.
+   */
+  private applyEffort<T extends { max_tokens: number; thinking?: unknown }>(params: T): T {
+    const thinking = this.buildThinking();
+    if (!thinking) return params;
+    (params as { thinking?: unknown }).thinking = thinking;
+    const minMaxTokens = thinking.budget_tokens + 4096;
+    if (params.max_tokens < minMaxTokens) {
+      params.max_tokens = minMaxTokens;
+    }
+    return params;
   }
 
   /**
@@ -52,10 +95,14 @@ export class ClaudeClient {
    */
   private buildSystem(systemPrompt: string): string | Anthropic.TextBlockParam[] {
     if (!this.usingOAuth) return systemPrompt;
-    return [
+    const blocks: Anthropic.TextBlockParam[] = [
       { type: 'text' as const, text: 'You are Claude Code, Anthropic\'s official CLI for Claude.' },
-      { type: 'text' as const, text: systemPrompt },
     ];
+    // Anthropic rejects empty text blocks; only append the project system prompt if non-empty
+    if (systemPrompt && systemPrompt.trim()) {
+      blocks.push({ type: 'text' as const, text: systemPrompt });
+    }
+    return blocks;
   }
 
   /**
@@ -66,7 +113,7 @@ export class ClaudeClient {
     messages: Message[],
     maxTokens: number = 16000
   ): Promise<string> {
-    const response = await this.createWithRetry({
+    const response = await this.createWithRetry(this.applyEffort({
       model: this.model,
       max_tokens: maxTokens,
       system: this.buildSystem(systemPrompt),
@@ -74,7 +121,7 @@ export class ClaudeClient {
         role: m.role,
         content: m.content,
       })),
-    });
+    }));
 
     const textBlock = response.content.find(b => b.type === 'text');
     if (!textBlock || textBlock.type !== 'text') {
@@ -103,13 +150,13 @@ export class ClaudeClient {
     let loopsRemaining = maxToolLoops;
 
     while (loopsRemaining-- > 0) {
-      const response = await this.createWithRetry({
+      const response = await this.createWithRetry(this.applyEffort({
         model: this.model,
         max_tokens: maxTokens,
         system: this.buildSystem(systemPrompt),
         tools,
         messages: currentMessages,
-      });
+      }));
 
       // Add assistant response to history
       currentMessages.push({
@@ -173,13 +220,13 @@ export class ClaudeClient {
       content: '[SYSTEM: Tool use limit reached. You MUST respond now with text only — no more tool calls. Summarize what you found and continue the conversation.]',
     });
 
-    const finalResponse = await this.createWithRetry({
+    const finalResponse = await this.createWithRetry(this.applyEffort({
       model: this.model,
       max_tokens: maxTokens,
       system: this.buildSystem(systemPrompt),
       tools: [], // no tools — forces text response
       messages: currentMessages,
-    });
+    }));
 
     const finalText = finalResponse.content
       .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -191,13 +238,21 @@ export class ClaudeClient {
 
   /**
    * Retry API calls on 500/529 errors with exponential backoff.
+   * Auto-streams when max_tokens > 32k OR extended thinking is enabled, since
+   * Anthropic's non-streaming endpoint rejects requests projected to take >10 min.
    */
   private async createWithRetry(
     params: Anthropic.MessageCreateParamsNonStreaming,
     maxRetries: number = 3
   ): Promise<Anthropic.Message> {
+    const mustStream = (params.max_tokens > 32000) || !!(params as any).thinking;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
+        if (mustStream) {
+          // Cast: messages.stream accepts the same param shape minus the explicit stream:true
+          const stream = this.client.messages.stream(params as unknown as Anthropic.MessageCreateParamsStreaming);
+          return await stream.finalMessage();
+        }
         return await this.client.messages.create(params);
       } catch (err: unknown) {
         const status = (err as any)?.status;
@@ -219,5 +274,9 @@ export class ClaudeClient {
 
   getModel(): string {
     return this.model;
+  }
+
+  getEffort(): EffortLevel {
+    return this.effort;
   }
 }

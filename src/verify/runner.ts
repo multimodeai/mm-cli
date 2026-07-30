@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, basename } from 'node:path';
 import chalk from 'chalk';
 import type { ClaudeClient } from '../engine/claude-client.js';
@@ -8,6 +9,7 @@ import type { VerifyResult, VerifyCriterion, VerifyConstraint } from './types.js
 
 const VERIFY_MAX_TOOL_LOOPS = 30;
 const VERIFY_MAX_TOKENS = 16384;
+const CHECK_TIMEOUT_MS = 600_000;
 
 const VERIFY_SYSTEM_PROMPT = `<role>
 You are a specification verification judge. You read a project specification
@@ -21,19 +23,24 @@ You have access to codebase tools: read_file, list_files, search_files.
 STEP 1: Read the spec carefully. Extract every acceptance criterion, every
 constraint, and the definition of done.
 
-STEP 2: Check if any criteria have been PRE-VERIFIED (listed in the
-PRE-VERIFIED CRITERIA section below the spec). These criteria have already
-been assessed — include them in your output exactly as provided.
-Do NOT re-assess or override pre-verified criteria.
+STEP 2: Some criteria may carry MACHINE-CHECKED results (below the spec) — a
+check COMMAND was actually executed and its exit code / output decided the
+verdict. These are ground truth. Report them EXACTLY as given; do NOT override,
+soften, or re-assess them. They are more authoritative than anything you can
+infer from reading code.
 
-STEP 3: For remaining (non-pre-verified) criteria — use the codebase tools:
-- Search for relevant files
-- Read the implementation
-- Assess whether the criterion is met, not met, partial, or unclear
-- Cite specific file paths and line numbers as evidence
+STEP 3: For the REMAINING criteria (no machine check) — use the codebase tools:
+- Search for relevant files, read the implementation.
+- Assess whether the criterion is met, not met, partial, or unclear.
+- Cite specific file paths and line numbers as evidence.
+- You are reading code, not running it. Your verdict is an opinion, not a proof.
+  Never claim "high" confidence for something only a running command could prove
+  (a test passing, a command being denied, an exit code). Use "medium" at most,
+  and prefer "unverifiable" when the criterion demands runtime evidence you cannot
+  observe by reading files.
 
 STEP 4: For each constraint (must do, must not do, prefer, escalate):
-- Verify satisfaction or violation with evidence
+- Verify satisfaction or violation with evidence.
 
 STEP 5: Assess the definition of done holistically.
 
@@ -53,72 +60,35 @@ Return ONLY a JSON object matching this schema:
 }
 
 Status guide:
-- "met": criterion is fully satisfied (verified via code or pre-verified evidence)
-- "not_met": criterion is clearly not satisfied (code is wrong/missing)
-- "partial": criterion is partially implemented
-- "unclear": cannot determine — need more investigation
-- "unverifiable": criterion requires runtime verification and no evidence exists
+- "met": criterion is fully satisfied.
+- "not_met": criterion is clearly not satisfied (code is wrong/missing).
+- "partial": criterion is partially implemented.
+- "unclear": cannot determine — need more investigation.
+- "unverifiable": criterion requires runtime verification and no evidence exists.
 </output-format>
 
 <guardrails>
-- Only assess based on what you can observe in the codebase AND any provided evidence
-- If you cannot find evidence for or against a criterion, mark it "unclear" with low confidence
-- Do not assume implementation exists — verify by reading actual files
-- Be honest about partial implementations — "partial" is valid
-- Cite specific file paths in evidence
-- CRITICAL: Pre-verified criteria MUST be included in your output with the status given.
-  Do not second-guess or downgrade them.
+- Only assess based on what you can observe in the codebase AND the machine-checked results.
+- Do NOT assume an implementation exists — verify by reading actual files.
+- Do NOT infer a criterion is met because the spec's own notes CLAIM a task was completed.
+  An author's claim of completion is not evidence; code or an executed check is.
+- Be honest about partial implementations — "partial" is valid.
+- Reserve "high" confidence for machine-checked criteria only. Static reading is "medium" at most.
+- MACHINE-CHECKED criteria MUST appear in your output with the status given. Never downgrade or upgrade them.
 </guardrails>`;
 
 /**
- * Extract completed tasks from spec's task decomposition section.
- * Returns a map of task content (everything under a ✅ task header).
+ * A single line of the machine-check contract: `AC<n> PASS|FAIL|SKIP <detail>`.
  */
-function extractCompletedTasks(specContent: string): string[] {
-  const tasks: string[] = [];
-  const lines = specContent.split('\n');
-  let currentTask: string[] = [];
-  let inCompletedTask = false;
-
-  for (const line of lines) {
-    // Match task headers like "**Task 1: Database Backup** ✅" or "*Task 1: ...** ✅"
-    const taskMatch = line.match(/\*{1,2}Task\s+\d+[^*]*\*{1,2}\s*(?:—\s*)?(.*)$/i);
-    if (taskMatch) {
-      // Save previous task
-      if (inCompletedTask && currentTask.length > 0) {
-        tasks.push(currentTask.join('\n'));
-      }
-      // Check if this task is completed
-      inCompletedTask = /✅/.test(line);
-      currentTask = inCompletedTask ? [line] : [];
-      continue;
-    }
-
-    // Stop at next major section (numbered ALL-CAPS header or markdown heading)
-    if (/^(?:\d+[\.\)]\s+[A-Z][A-Z\s&]+$|#{1,3}\s)/.test(line)) {
-      if (inCompletedTask && currentTask.length > 0) {
-        tasks.push(currentTask.join('\n'));
-      }
-      inCompletedTask = false;
-      currentTask = [];
-      continue;
-    }
-
-    if (inCompletedTask) {
-      currentTask.push(line);
-    }
-  }
-
-  // Don't forget last task
-  if (inCompletedTask && currentTask.length > 0) {
-    tasks.push(currentTask.join('\n'));
-  }
-
-  return tasks;
+export interface CheckResult {
+  acNum: number;
+  verdict: 'PASS' | 'FAIL' | 'SKIP';
+  detail: string;
 }
 
 /**
- * Extract acceptance criteria from spec.
+ * Extract acceptance criteria from the spec, in document order.
+ * criteria[n-1] corresponds to the spec's "AC<n>".
  */
 function extractCriteria(specContent: string): string[] {
   const criteria: string[] = [];
@@ -137,7 +107,8 @@ function extractCriteria(specContent: string): string[] {
       inCriteria = false;
     }
     if (inCriteria) {
-      const match = line.match(/^\s*(?:[-*]|\d+[.)]) ?\[?\d*\]?\s*(.+)/);
+      // bullet or number, then an OPTIONAL checkbox/bracket-number ([ ] [x] [1]), then the text.
+      const match = line.match(/^\s*(?:[-*]|\d+[.)])\s*(?:\[[ xX\d]*\]\s*)?(.+)/);
       if (match) {
         criteria.push(match[1].trim());
       }
@@ -148,173 +119,81 @@ function extractCriteria(specContent: string): string[] {
 }
 
 /**
- * Match criteria to completed tasks to pre-verify runtime criteria.
- * Returns pre-verified criteria with evidence extracted from task content.
+ * Locate the executable check manifest for a spec.
+ * Convention: verify/checks/<spec-name>.sh (or the same path without .sh),
+ * unless an explicit path is supplied.
  */
-function preVerifyCriteria(
-  criteria: string[],
-  completedTasks: string[],
-  evidenceContent: string | null,
-): { criterion: string; status: string; evidence: string; confidence: string }[] {
-  if (completedTasks.length === 0 && !evidenceContent) return [];
+export function locateCheckScript(
+  specFile: string,
+  projectRoot: string,
+  explicit?: string,
+): string | null {
+  if (explicit) return existsSync(explicit) ? explicit : null;
+  const name = basename(specFile, '.md');
+  const candidates = [
+    join(projectRoot, 'verify', 'checks', `${name}.sh`),
+    join(projectRoot, 'verify', 'checks', name),
+  ];
+  return candidates.find(p => existsSync(p)) ?? null;
+}
 
-  const allTaskContent = completedTasks.join('\n\n');
-  const preVerified: { criterion: string; status: string; evidence: string; confidence: string }[] = [];
+/**
+ * Run the check manifest. The script is EXPECTED to print, on stdout, one line
+ * per checked criterion in the form `AC<n> PASS|FAIL|SKIP <detail>`. It may exit
+ * non-zero when any check FAILs — that is not an error, the per-line verdicts are
+ * the source of truth. Returns the parsed results plus the raw log.
+ */
+export function runChecks(
+  scriptPath: string,
+  projectRoot: string,
+): { results: CheckResult[]; log: string } {
+  let out = '';
+  try {
+    out = execFileSync('bash', [scriptPath], {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      timeout: CHECK_TIMEOUT_MS,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  } catch (e: any) {
+    // A non-zero exit (any FAIL) still carries the per-line verdicts on stdout/stderr.
+    out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+    if (!out && e.message) out = e.message;
+  }
 
-  for (const criterion of criteria) {
-    // Extract key phrases from the criterion for matching
-    const phrases = extractKeyPhrases(criterion);
-    const matchingEvidence: string[] = [];
-
-    // Check completed tasks for evidence
-    for (const task of completedTasks) {
-      const matchCount = phrases.filter(p => task.toLowerCase().includes(p.toLowerCase())).length;
-      if (matchCount >= Math.max(1, Math.floor(phrases.length * 0.3))) {
-        // Extract the relevant lines from the task
-        const relevantLines = task.split('\n')
-          .filter(l => l.trim().length > 0)
-          .filter(l => {
-            const lower = l.toLowerCase();
-            return phrases.some(p => lower.includes(p.toLowerCase())) ||
-              /✅|verified|confirmed|result|output|created|completed|mismatch|backup|snapshot/i.test(l);
-          });
-        if (relevantLines.length > 0) {
-          matchingEvidence.push(relevantLines.join('; '));
-        }
-      }
-    }
-
-    // Check evidence file
-    if (evidenceContent) {
-      // Look for criterion number or text in evidence
-      const criterionIndex = criteria.indexOf(criterion) + 1;
-      const evidenceSection = evidenceContent.match(
-        new RegExp(`###\\s*\\[${criterionIndex}\\][\\s\\S]*?(?=###|$)`, 'i')
-      );
-      if (evidenceSection) {
-        const verified = /\[x\]\s*verified/i.test(evidenceSection[0]);
-        if (verified) {
-          const evidenceLine = evidenceSection[0].match(/\*\*Evidence:\*\*\s*(.*)/);
-          if (evidenceLine) {
-            matchingEvidence.push(evidenceLine[1].trim());
-          }
-        }
-      }
-    }
-
-    if (matchingEvidence.length > 0) {
-      preVerified.push({
-        criterion,
-        status: 'met',
-        evidence: `Pre-verified from spec: ${matchingEvidence[0].slice(0, 300)}`,
-        confidence: 'high',
+  const results: CheckResult[] = [];
+  const seen = new Set<number>();
+  for (const line of out.split('\n')) {
+    const m = line.match(/^\s*AC\s*#?\s*(\d+)\s+(PASS|FAIL|SKIP)\b\s*(.*)$/i);
+    if (m) {
+      const acNum = parseInt(m[1], 10);
+      if (seen.has(acNum)) continue; // first verdict per AC wins
+      seen.add(acNum);
+      results.push({
+        acNum,
+        verdict: m[2].toUpperCase() as CheckResult['verdict'],
+        detail: m[3].trim(),
       });
     }
   }
-
-  return preVerified;
-}
-
-/**
- * Extract key matching phrases from a criterion text.
- */
-function extractKeyPhrases(criterion: string): string[] {
-  const phrases: string[] = [];
-
-  // Extract quoted values, file paths, numbers with units
-  const patterns = [
-    /`([^`]+)`/g,           // backtick-quoted
-    /\b\d+\.?\d*\s*(?:MB|KB|GB|ms|s)\b/gi, // numbers with units
-    /\bpg_dump\b/gi,
-    /\bpg_restore\b/gi,
-    /\bbackup\b/gi,
-    /\bsnapshot\b/gi,
-    /\bverification\b/gi,
-    /\bmismatch/gi,
-    /\brollback\b/gi,
-    /\bunpair\b/gi,
-    /\bforce.pair\b/gi,
-    /\b[A-Z]{2,5}\b/g,     // ticker symbols
-  ];
-
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(criterion)) !== null) {
-      phrases.push(match[1] || match[0]);
-    }
-  }
-
-  // Also extract significant nouns (3+ word phrases minus stopwords)
-  const words = criterion.split(/\s+/).filter(w =>
-    w.length > 3 && !/^(the|and|for|are|was|were|with|that|this|from|have|been|into|each|than|also)$/i.test(w)
-  );
-  if (words.length > 0) {
-    phrases.push(...words.slice(0, 5));
-  }
-
-  return [...new Set(phrases)];
-}
-
-/**
- * Look for runtime evidence files for a given spec.
- */
-function loadEvidenceFile(specFile: string): string | null {
-  const specName = basename(specFile, '.md');
-  const cwd = process.cwd();
-
-  const candidates = [
-    join(cwd, 'verify', 'evidence', `${specName}.md`),
-    join(cwd, 'verify', 'evidence', `${specName}.json`),
-    join(cwd, 'verify', 'evidence', `${specName}.txt`),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      try {
-        return readFileSync(candidate, 'utf-8');
-      } catch {
-        // ignore read errors
-      }
-    }
-  }
-
-  return null;
+  return { results, log: out };
 }
 
 /**
  * Extract JSON from a response that might contain markdown code fences or extra text.
- *
- * Returns ordered candidates to try with JSON.parse. The model may emit:
- *   1. A ```json fenced block, with possibly other ``` fences in surrounding prose
- *   2. A bare JSON object, with prose around it
- *   3. Raw JSON only
- * The previous non-greedy single-strategy approach silently closed at the first
- * `\`\`\`` in prose when discussing embedded fences, truncating the JSON.
  */
 function extractJsonCandidates(text: string): string[] {
   const candidates: string[] = [];
-
-  // Strategy 1: ```json ... ``` with the LAST ``` in the response treated as the close.
-  // This handles the case where prose before the JSON discusses other triple-backticks.
   const tagged = text.match(/```json\s*\n([\s\S]*)\n```/);
   if (tagged) candidates.push(tagged[1].trim());
-
-  // Strategy 2: lazy ```json ... ``` (closes at first ``` after open).
   const taggedLazy = text.match(/```json\s*\n([\s\S]*?)\n```/);
   if (taggedLazy) candidates.push(taggedLazy[1].trim());
-
-  // Strategy 3: any code fence with greedy close.
   const anyFence = text.match(/```(?:\w+)?\s*\n([\s\S]*)\n```/);
   if (anyFence) candidates.push(anyFence[1].trim());
-
-  // Strategy 4: bare `{ ... }` greedy.
   const bare = text.match(/\{[\s\S]*\}/);
   if (bare) candidates.push(bare[0]);
-
-  // Strategy 5: raw text.
   candidates.push(text.trim());
 
-  // Dedupe while preserving order
   const seen = new Set<string>();
   return candidates.filter(c => {
     if (seen.has(c)) return false;
@@ -323,49 +202,65 @@ function extractJsonCandidates(text: string): string[] {
   });
 }
 
-/**
- * Backward-compat single-string entry point — returns the first candidate.
- */
-function extractJson(text: string): string {
-  return extractJsonCandidates(text)[0];
+export interface RunSpecVerifyOptions {
+  verbose?: boolean;
+  /** explicit path to a check manifest (overrides the convention lookup). */
+  checksPath?: string;
+  /** project root used to resolve the check manifest + run it. */
+  projectRoot?: string;
+  /** skip the executable check layer entirely (judge-only, clearly labelled). */
+  noChecks?: boolean;
 }
 
 export async function runSpecVerify(
   specContent: string,
   client: ClaudeClient,
   specFile: string,
-  options?: { verbose?: boolean }
+  options?: RunSpecVerifyOptions,
 ): Promise<VerifyResult> {
-  const systemPrompt = VERIFY_SYSTEM_PROMPT;
-
-  // Pre-extract and pre-verify runtime criteria
+  const projectRoot = options?.projectRoot ?? process.cwd();
   const criteria = extractCriteria(specContent);
-  const completedTasks = extractCompletedTasks(specContent);
-  const evidence = loadEvidenceFile(specFile);
-  const preVerified = preVerifyCriteria(criteria, completedTasks, evidence);
 
-  if (preVerified.length > 0) {
-    console.log(chalk.blue(`  ℹ Pre-verified ${preVerified.length} criteria from spec task results`));
-  }
-  if (evidence) {
-    console.log(chalk.blue('  ℹ Found runtime evidence file'));
-  }
-
-  // Build user message with pre-verified criteria injected
-  let userMessage = `Here is the specification to verify against the codebase:\n\n---\n${specContent}\n---\n\n`;
-
-  if (preVerified.length > 0) {
-    userMessage += `\n## PRE-VERIFIED CRITERIA\n\nThe following criteria have been pre-verified from the spec's own documented task results.\nInclude them in your output EXACTLY as shown — do NOT re-assess or change their status:\n\n`;
-    for (const pv of preVerified) {
-      userMessage += `- Criterion: "${pv.criterion}"\n  Status: ${pv.status}\n  Evidence: ${pv.evidence}\n  Confidence: ${pv.confidence}\n\n`;
+  // --- 1. Executable check layer (ground truth) ---------------------------- //
+  let checkResults: CheckResult[] = [];
+  let checksRan = false;
+  if (!options?.noChecks) {
+    const scriptPath = locateCheckScript(specFile, projectRoot, options?.checksPath);
+    if (scriptPath) {
+      console.log(chalk.blue(`  ⚙ Running check manifest: ${scriptPath}`));
+      const { results } = runChecks(scriptPath, projectRoot);
+      checkResults = results;
+      checksRan = true;
+      const pass = results.filter(r => r.verdict === 'PASS').length;
+      const fail = results.filter(r => r.verdict === 'FAIL').length;
+      const skip = results.filter(r => r.verdict === 'SKIP').length;
+      console.log(chalk.blue(`  ⚙ Executed ${results.length} checks: ${pass} PASS, ${fail} FAIL, ${skip} SKIP`));
+    } else {
+      console.log(chalk.yellow('  ⚠ No check manifest found (verify/checks/<spec>.sh) — this run is JUDGE-ONLY (static, unproven).'));
     }
   }
 
-  userMessage += `Investigate the codebase for the remaining criteria and produce a JSON verification result.`;
+  const checkByAc = new Map<number, CheckResult>();
+  for (const r of checkResults) checkByAc.set(r.acNum, r);
 
-  const apiMessages: Anthropic.MessageParam[] = [
-    { role: 'user', content: userMessage },
-  ];
+  // --- 2. LLM judge for the remaining criteria ----------------------------- //
+  let userMessage = `Here is the specification to verify against the codebase:\n\n---\n${specContent}\n---\n\n`;
+
+  if (checkResults.length > 0) {
+    userMessage += `\n## MACHINE-CHECKED CRITERIA (ground truth — a command was executed)\n\n`;
+    userMessage += `These verdicts came from actually running a check command. Report them EXACTLY; do NOT override:\n\n`;
+    for (const r of checkResults) {
+      const idx = r.acNum - 1;
+      const text = idx >= 0 && idx < criteria.length ? criteria[idx] : `(AC${r.acNum})`;
+      const status = r.verdict === 'PASS' ? 'met' : r.verdict === 'FAIL' ? 'not_met' : 'unverifiable';
+      userMessage += `- AC${r.acNum}: ${status.toUpperCase()} — "${text.slice(0, 90)}"\n  Executed result: ${r.detail || r.verdict}\n\n`;
+    }
+    userMessage += `Investigate the codebase ONLY for the criteria NOT listed above, then produce the JSON.\n`;
+  } else {
+    userMessage += `No machine checks were available. Investigate the codebase for every criterion and produce the JSON.\n`;
+  }
+
+  const apiMessages: Anthropic.MessageParam[] = [{ role: 'user', content: userMessage }];
 
   const onToolUse = (name: string, input: Record<string, unknown>) => {
     const detail = input.path || input.pattern || input.file_pattern || input.query || '';
@@ -373,7 +268,7 @@ export async function runSpecVerify(
   };
 
   const result = await client.sendWithTools(
-    systemPrompt,
+    VERIFY_SYSTEM_PROMPT,
     apiMessages,
     CODEBASE_TOOLS as Anthropic.Tool[],
     onToolUse,
@@ -384,7 +279,6 @@ export async function runSpecVerify(
   const timestamp = new Date().toISOString();
   const model = client.getModel();
 
-  // Try each candidate JSON extraction strategy until one parses cleanly.
   const candidates = extractJsonCandidates(result.text);
   let parsed: any = null;
   let lastErr: unknown = null;
@@ -402,12 +296,99 @@ export async function runSpecVerify(
       throw lastErr instanceof Error ? lastErr : new Error('No JSON candidate parsed');
     }
 
-    const resultCriteria: VerifyCriterion[] = (parsed.criteria || []).map((c: any) => ({
-      criterion: c.criterion || '',
-      status: validateStatus(c.status),
-      evidence: c.evidence || '',
-      confidence: validateConfidence(c.confidence),
-    }));
+    // --- 2b. Index-canonical merge ----------------------------------------- //
+    // The EXTRACTED criteria (in spec order) are the canonical list; output slot i
+    // is the spec's AC(i+1). Each slot is filled by authority: an executed check
+    // for AC(i+1) (ground truth) > the judge's verdict best-matched to that
+    // criterion (static) > "unclear" (judge was silent). An executed result can
+    // therefore NEVER clobber a different criterion (the old index-fallback bug
+    // silently deleted a real not_met), and a judged 'high' is capped to 'medium'.
+    const judgePool: (VerifyCriterion & { used?: boolean })[] = (parsed.criteria || []).map((c: any) => {
+      const status = validateStatus(c.status);
+      let confidence = validateConfidence(c.confidence);
+      if (confidence === 'high') confidence = 'medium';
+      return {
+        criterion: c.criterion || '',
+        status,
+        evidence: c.evidence || '',
+        confidence,
+        source: status === 'unverifiable' ? 'unverified' : 'judged',
+      } as VerifyCriterion & { used?: boolean };
+    });
+
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const overlap = (a: string, b: string): number => {
+      const A = new Set(norm(a).split(' ').filter(Boolean));
+      const B = new Set(norm(b).split(' ').filter(Boolean));
+      if (!A.size || !B.size) return 0;
+      let inter = 0;
+      for (const t of A) if (B.has(t)) inter++;
+      return inter / Math.min(A.size, B.size);
+    };
+    const takeJudge = (text: string): VerifyCriterion | null => {
+      let best = -1;
+      let bestScore = 0.5; // require real token overlap, not a coincidental substring
+      for (let j = 0; j < judgePool.length; j++) {
+        if (judgePool[j].used) continue;
+        const s = overlap(text, judgePool[j].criterion);
+        if (s > bestScore) { bestScore = s; best = j; }
+      }
+      if (best < 0) return null;
+      judgePool[best].used = true;
+      const { used: _u, ...c } = judgePool[best];
+      return { ...c, criterion: text };
+    };
+    const executedFor = (acNum: number, text: string): VerifyCriterion => {
+      const r = checkByAc.get(acNum)!;
+      const status: VerifyCriterion['status'] =
+        r.verdict === 'PASS' ? 'met' : r.verdict === 'FAIL' ? 'not_met' : 'unverifiable';
+      return {
+        criterion: text || `AC${acNum}`,
+        status,
+        evidence: `Executed check (AC${acNum}): ${r.detail || r.verdict}`,
+        confidence: status === 'unverifiable' ? 'low' : 'high',
+        source: status === 'unverifiable' ? 'unverified' : 'executed',
+      };
+    };
+
+    const resultCriteria: VerifyCriterion[] = [];
+    if (criteria.length > 0) {
+      for (let i = 0; i < criteria.length; i++) {
+        const acNum = i + 1;
+        const text = criteria[i];
+        if (checkByAc.has(acNum)) {
+          resultCriteria.push(executedFor(acNum, text));
+        } else {
+          resultCriteria.push(
+            takeJudge(text) ?? {
+              criterion: text,
+              status: 'unclear',
+              evidence: 'No judgement returned for this criterion.',
+              confidence: 'low',
+              source: 'judged',
+            },
+          );
+        }
+      }
+      // An executed check for an AC number OUTSIDE the extracted range is a manifest
+      // bug — surface it, never silently inject a phantom PROVEN criterion.
+      for (const r of checkResults) {
+        if (r.acNum < 1 || r.acNum > criteria.length) {
+          console.log(chalk.yellow(`  ⚠ Check emitted AC${r.acNum} but the spec has ${criteria.length} criteria — ignored (fix the manifest).`));
+        }
+      }
+    } else {
+      // Criteria could not be extracted — report the judge's list, applying executed
+      // results by position (best effort), and say so loudly.
+      console.log(chalk.yellow('  ⚠ Could not extract acceptance criteria from the spec; reporting the judge list as-is.'));
+      for (const j of judgePool) { const { used: _u, ...c } = j; resultCriteria.push(c); }
+      for (const r of checkResults) {
+        const idx = r.acNum - 1;
+        if (idx >= 0 && idx < resultCriteria.length) {
+          resultCriteria[idx] = executedFor(r.acNum, resultCriteria[idx].criterion);
+        }
+      }
+    }
 
     const constraints: VerifyConstraint[] = (parsed.constraints || []).map((c: any) => ({
       constraint: c.constraint || '',
@@ -416,34 +397,45 @@ export async function runSpecVerify(
       evidence: c.evidence || '',
     }));
 
-    const definitionOfDone = {
-      met: Boolean(parsed.definitionOfDone?.met),
-      reasoning: parsed.definitionOfDone?.reasoning || '',
-    };
-
-    // Post-process: force pre-verified criteria to "met" even if the model ignored the instruction
-    for (const pv of preVerified) {
-      const matching = resultCriteria.find(c =>
-        c.criterion.toLowerCase().includes(pv.criterion.slice(0, 40).toLowerCase()) ||
-        pv.criterion.toLowerCase().includes(c.criterion.slice(0, 40).toLowerCase())
-      );
-      if (matching && matching.status !== 'met') {
-        matching.status = 'met';
-        matching.evidence = pv.evidence;
-        matching.confidence = 'high';
-      }
-    }
-
+    // --- 4. Counts + honest DoD (computed here, not taken from the LLM) ----- //
     const met = resultCriteria.filter(c => c.status === 'met').length;
     const notMet = resultCriteria.filter(c => c.status === 'not_met').length;
     const partial = resultCriteria.filter(c => c.status === 'partial').length;
     const unclear = resultCriteria.filter(c => c.status === 'unclear').length;
     const unverifiable = resultCriteria.filter(c => c.status === 'unverifiable').length;
+    const proven = resultCriteria.filter(c => c.source === 'executed' && c.status === 'met').length;
+    const failed = resultCriteria.filter(c => c.source === 'executed' && c.status === 'not_met').length;
+    const judged = resultCriteria.filter(c => c.source === 'judged').length;
 
-    const verifiableTotal = resultCriteria.length - unverifiable;
-    const score = unverifiable > 0
-      ? `${met}/${verifiableTotal} verifiable criteria met (${unverifiable} runtime-only)`
-      : `${met}/${resultCriteria.length} criteria met`;
+    const total = resultCriteria.length;
+    // "Provably done" = EVERY criterion proven met by an executed check. A judged-met
+    // criterion (LLM opinion) does NOT satisfy the DoD, and a judge-only run (nothing
+    // executed) can never be done. This is the whole point: no green off opinion.
+    const provenAll = total > 0 && resultCriteria.every(c => c.source === 'executed' && c.status === 'met');
+    const dodMet = checksRan && provenAll;
+    const judgedMet = met - proven; // "met" resting on judgement, not execution
+
+    let dodReasoning: string;
+    if (!checksRan) {
+      dodReasoning = `JUDGE-ONLY run (no check manifest) — nothing was executed, so nothing is PROVEN and the DoD cannot be met. `
+        + `Add verify/checks/${basename(specFile, '.md')}.sh to make this provable and repeatable. `
+        + `(${met} judged-met, ${notMet} not-met, ${partial} partial, ${unclear} unclear, ${unverifiable} runtime-only.)`;
+    } else if (dodMet) {
+      dodReasoning = `Provably done: all ${total} criteria PROVEN by executed checks.`;
+    } else {
+      const gaps: string[] = [];
+      if (failed > 0) gaps.push(`${failed} FAILED a check`);
+      if (notMet - failed > 0) gaps.push(`${notMet - failed} judged not-met`);
+      if (partial > 0) gaps.push(`${partial} partial`);
+      if (unclear > 0) gaps.push(`${unclear} unclear`);
+      if (unverifiable > 0) gaps.push(`${unverifiable} unproven/runtime-only`);
+      if (judgedMet > 0) gaps.push(`${judgedMet} judged-met but UNPROVEN (add a check)`);
+      dodReasoning = `Not provably done: ${gaps.join(', ')}. ${proven}/${total} proven by execution.`;
+    }
+
+    const score = checksRan
+      ? `${proven}/${total} PROVEN by execution` + (judged > 0 ? `, ${judged} judged` : '') + (failed > 0 ? `, ${failed} FAILED` : '')
+      : `${met}/${total} judged met (0 proven — judge-only run)`;
 
     return {
       specFile,
@@ -451,31 +443,25 @@ export async function runSpecVerify(
       model,
       criteria: resultCriteria,
       constraints,
-      definitionOfDone,
+      definitionOfDone: { met: dodMet, reasoning: dodReasoning },
       summary: {
-        totalCriteria: resultCriteria.length,
+        totalCriteria: total,
         met,
         notMet,
         partial,
         unclear,
         unverifiable,
+        proven,
+        failed,
+        judged,
+        checksRan,
         score,
       },
     };
   } catch (err) {
-    // Fallback if JSON parsing fails — surface the raw response so the user
-    // can diagnose. The catch swallowed too much silently in earlier versions.
     const errMsg = err instanceof Error ? err.message : String(err);
     const preview = result.text.slice(0, 4000);
     const tail = result.text.length > 4000 ? `\n\n…(truncated, total ${result.text.length} chars)` : '';
-    // Best-effort: save raw text + candidates to /tmp for offline diagnosis.
-    try {
-      const dumpPath = `/tmp/mm-verify-raw-${Date.now()}.txt`;
-      const dump = `=== RAW MODEL RESPONSE (${result.text.length} chars) ===\n${result.text}\n\n=== CANDIDATES (${candidates.length}) ===\n${candidates.map((c, i) => `--- candidate ${i} (${c.length} chars) ---\n${c}`).join('\n\n')}`;
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require('node:fs').writeFileSync(dumpPath, dump, 'utf-8');
-      console.log(`  ⓘ Raw response saved to ${dumpPath}`);
-    } catch { /* best-effort */ }
     return {
       specFile,
       timestamp,
@@ -487,12 +473,8 @@ export async function runSpecVerify(
         reasoning: `Failed to parse verification response: ${errMsg}\n\nRAW RESPONSE PREVIEW:\n${preview}${tail}`,
       },
       summary: {
-        totalCriteria: 0,
-        met: 0,
-        notMet: 0,
-        partial: 0,
-        unclear: 0,
-        unverifiable: 0,
+        totalCriteria: 0, met: 0, notMet: 0, partial: 0, unclear: 0, unverifiable: 0,
+        proven: 0, failed: 0, judged: 0, checksRan,
         score: 'Parse error — no criteria extracted',
       },
     };

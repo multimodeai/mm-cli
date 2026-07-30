@@ -39,6 +39,17 @@ npm run build && npm link             # Build dist/ and install globally as 'mm'
 
 **After any code change, run `npm run build` before testing the global `mm` binary.** The bin entry points to `dist/`, not `src/`. If you skip the build, the old binary runs and you will confidently tell the user a feature works when it doesn't.
 
+## E2E Testing — drive the real `mm` binary
+
+Unit tests (`npx vitest run`) are necessary but NOT sufficient — they don't prove a command works for a user. For any command change, reproduce the real invocation:
+
+- Build first, then run the command the way a user would: `mm <command> [args]` (global) or `npx tsx src/index.ts <command>` (source).
+- Inspect the **actual output** — generated artifact, printed result, exit code — not just that the process exited 0.
+- Interview commands: run the interview through to an artifact. Eval commands: run a real WITH-skill vs WITHOUT-skill A/B and read the scores.
+- Reproduce a reported bug at the CLI level (real args/flags) before fixing.
+
+Can't cover cheaply in CI: fully interactive interview loops (need piped stdin) and real API cost/latency — gate those behind a manual/opt-in run, not the default suite.
+
 ## Dependencies (strict budget)
 
 Production: `@anthropic-ai/sdk`, `commander`, `yaml`, `chalk`

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import type { VerifyResult } from './types.js';
+import type { VerifyResult, VerifyCriterion } from './types.js';
 
 export function formatVerifyResult(result: VerifyResult): string {
   const lines: string[] = [];
@@ -7,6 +7,11 @@ export function formatVerifyResult(result: VerifyResult): string {
 
   lines.push(chalk.bold.cyan(`\nSpec Verification: ${specName}`));
   lines.push(chalk.cyan('══════════════════════════════════════════'));
+
+  if (!result.summary.checksRan) {
+    lines.push(chalk.yellow('  ⚠ JUDGE-ONLY run — no check manifest, nothing executed. Verdicts are static opinion, not proof.'));
+    lines.push(chalk.dim(`     Add verify/checks/${specName}.sh to make this provable and repeatable.`));
+  }
 
   // Acceptance Criteria
   lines.push(chalk.bold('\nACCEPTANCE CRITERIA'));
@@ -16,9 +21,10 @@ export function formatVerifyResult(result: VerifyResult): string {
   for (let i = 0; i < result.criteria.length; i++) {
     const c = result.criteria[i];
     const icon = statusIcon(c.status);
-    const conf = chalk.dim(`(${c.confidence} confidence)`);
-    lines.push(`  ${icon} [${i + 1}] ${c.criterion}  ${conf}`);
-    if (c.status !== 'met' && c.evidence) {
+    const tier = tierLabel(c);
+    lines.push(`  ${icon} [${i + 1}] ${c.criterion}  ${tier}`);
+    // Always show evidence for non-proven-met so the basis is visible.
+    if (!(c.status === 'met' && c.source === 'executed') && c.evidence) {
       lines.push(chalk.dim(`      → ${c.evidence}`));
     }
   }
@@ -44,23 +50,34 @@ export function formatVerifyResult(result: VerifyResult): string {
     lines.push(chalk.red(`  ✗ Not met — ${result.definitionOfDone.reasoning}`));
   }
 
-  // Summary
+  // Summary — lead with PROVEN vs judged so the honesty tier is unmissable.
   lines.push(chalk.bold(`\nSUMMARY: ${result.summary.score}`));
+  const s = result.summary;
   const details: string[] = [];
-  if (result.summary.partial > 0) details.push(`${result.summary.partial} partial`);
-  if (result.summary.unclear > 0) details.push(`${result.summary.unclear} unclear`);
-  if (result.summary.unverifiable > 0) details.push(`${result.summary.unverifiable} unverifiable (runtime-only)`);
+  if (s.proven > 0) details.push(chalk.green(`${s.proven} proven`));
+  if (s.failed > 0) details.push(chalk.red(`${s.failed} FAILED`));
+  if (s.judged > 0) details.push(chalk.yellow(`${s.judged} judged (static)`));
+  if (s.partial > 0) details.push(`${s.partial} partial`);
+  if (s.unclear > 0) details.push(`${s.unclear} unclear`);
+  if (s.unverifiable > 0) details.push(chalk.blue(`${s.unverifiable} unproven (runtime-only)`));
   if (details.length > 0) {
-    lines.push(chalk.dim(`  ${details.join(', ')}`));
+    lines.push(`  ${details.join(chalk.dim(' · '))}`);
   }
 
-  // Note runtime-only criteria
-  if (result.summary.unverifiable > 0) {
+  if (s.checksRan && s.judged > 0) {
     lines.push('');
-    lines.push(chalk.yellow(`  ℹ ${result.summary.unverifiable} criteria require runtime verification (e.g., live testing, manual QA).`));
+    lines.push(chalk.yellow(`  ℹ ${s.judged} criteria are only JUDGED (an LLM read the code). Add executed checks to prove them.`));
   }
 
   return lines.join('\n');
+}
+
+/** A short tier badge so PROVEN vs judged reads at a glance. */
+function tierLabel(c: VerifyCriterion): string {
+  if (c.source === 'executed' && c.status === 'met') return chalk.green('[PROVEN]');
+  if (c.source === 'executed' && c.status === 'not_met') return chalk.red('[FAILED check]');
+  if (c.source === 'unverified' || c.status === 'unverifiable') return chalk.blue('[unproven — needs runtime]');
+  return chalk.yellow(`[judged · ${c.confidence}]`);
 }
 
 function statusIcon(status: string): string {

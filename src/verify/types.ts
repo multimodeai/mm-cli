@@ -3,6 +3,13 @@ export interface VerifyCriterion {
   status: 'met' | 'not_met' | 'partial' | 'unclear' | 'unverifiable';
   evidence: string;
   confidence: 'high' | 'medium' | 'low';
+  /**
+   * HOW the status was reached — the honesty tier.
+   * - 'executed':   a check command ran and its exit/output decided the status (ground truth).
+   * - 'judged':     an LLM read the code and formed an opinion (static, never above medium confidence).
+   * - 'unverified': no check ran and the LLM could not tell (needs a runtime proof).
+   */
+  source?: 'executed' | 'judged' | 'unverified';
 }
 
 export interface VerifyConstraint {
@@ -29,6 +36,14 @@ export interface VerifyResult {
     partial: number;
     unclear: number;
     unverifiable: number;
+    /** criteria a check command PROVED (executed + met). */
+    proven: number;
+    /** criteria a check command DISPROVED (executed + not_met). */
+    failed: number;
+    /** criteria only an LLM judged (static, no command ran). */
+    judged: number;
+    /** whether an executable check manifest was found and run. */
+    checksRan: boolean;
     score: string;
   };
 }
