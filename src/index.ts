@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { Command } from 'commander';
 import { registerPreflight } from './commands/preflight.js';
 import { registerDiagnose } from './commands/diagnose.js';
@@ -12,11 +15,16 @@ import { registerConstraint } from './commands/constraint.js';
 import { registerSkill } from './commands/skill.js';
 import { registerHarness } from './commands/harness.js';
 
+// Read the version from package.json at runtime instead of hardcoding it here,
+// so `mm --version` can never drift from the real package version again.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'));
+
 const program = new Command();
 
 program
   .name('mm')
-  .version('0.1.0')
+  .version(pkg.version)
   .description(
     'Operationalize the 4 disciplines of AI input with measurable eval outcomes.\n\n' +
     '  Prompt Craft    → mm preflight, mm rewrite\n' +
