@@ -1,6 +1,6 @@
 {
   "name": "mm-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Developer tool that operationalizes the 4 disciplines of AI input with measurable eval outcomes",
   "type": "module",
   "bin": {

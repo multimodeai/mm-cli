@@ -90,7 +90,7 @@ export interface CheckResult {
  * Extract acceptance criteria from the spec, in document order.
  * criteria[n-1] corresponds to the spec's "AC<n>".
  */
-function extractCriteria(specContent: string): string[] {
+export function extractCriteria(specContent: string): string[] {
   const criteria: string[] = [];
   let inCriteria = false;
 
@@ -99,16 +99,27 @@ function extractCriteria(specContent: string): string[] {
       inCriteria = true;
       continue;
     }
+    // A new section closes the criteria block. A section heading is a markdown
+    // heading, a `---` rule, or a NUMBERED ALL-CAPS title. "All-caps" is detected
+    // as "contains no lowercase letter", so punctuation in the title (e.g.
+    // "OPEN QUESTIONS / NOTES") no longer smuggles the block open into the next
+    // section — while a real criterion like "1. `Foo` works" (has lowercase) is
+    // never mistaken for a heading.
     if (inCriteria && !line.match(/^\s*$/) && (
       /^#{1,3}\s/.test(line) ||
       /^---/.test(line) ||
-      /^\d+[\.\)]\s+[A-Z][A-Z\s&]+$/.test(line)
+      /^\d+[.)]\s+[A-Z0-9][^a-z]*$/.test(line)
     ) && !/acceptance/i.test(line)) {
       inCriteria = false;
     }
     if (inCriteria) {
-      // bullet or number, then an OPTIONAL checkbox/bracket-number ([ ] [x] [1]), then the text.
-      const match = line.match(/^\s*(?:[-*]|\d+[.)])\s*(?:\[[ xX\d]*\]\s*)?(.+)/);
+      // A criterion line starts with a bullet, a number, OR a bare checkbox,
+      // then an OPTIONAL checkbox/bracket-number ([ ] [x] [1]), then the text.
+      // The leading marker is required so wrapped prose continuation lines are
+      // skipped; the bare-checkbox alternative supports `[ ] ...` task lists.
+      const match = line.match(
+        /^\s*(?:(?:[-*]|\d+[.)])\s*(?:\[[ xX\d]*\]\s*)?|\[[ xX\d]*\]\s*)(.+)/,
+      );
       if (match) {
         criteria.push(match[1].trim());
       }

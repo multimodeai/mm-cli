@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runSpecVerify, VERIFY_SYSTEM_PROMPT } from '../../src/verify/index.js';
+import { extractCriteria } from '../../src/verify/runner.js';
 import type { ClaudeClient } from '../../src/engine/claude-client.js';
 
 function createMockClient(responseJson: object): ClaudeClient {
@@ -30,6 +31,44 @@ Must Do:
 
 7. DEFINITION OF DONE
 All features work.`;
+
+describe('extractCriteria', () => {
+  it('parses numbered acceptance criteria and stops at the next section', () => {
+    const spec = `2. ACCEPTANCE CRITERIA
+1. Feature A works
+2. Feature B works
+
+3. CONSTRAINTS
+- unrelated bullet`;
+    expect(extractCriteria(spec)).toEqual(['Feature A works', 'Feature B works']);
+  });
+
+  it('parses bare [ ] checkboxes and does NOT bleed a punctuated next heading (kaya-editor regression)', () => {
+    // The exact shape that misfired: bare-checkbox criteria followed by a
+    // section titled with a "/", which the old ALL-CAPS heading detector
+    // failed to recognize, slurping section 12's open questions as criteria.
+    const spec = `11. PHASE 1 ACCEPTANCE CRITERIA
+  [ ] serves on localhost and injects the overlay
+  [ ] poll returns feedback plus a session-ended signal
+
+12. OPEN QUESTIONS / NOTES
+  - decide packaging later
+  - confirm cloudflare setup`;
+    expect(extractCriteria(spec)).toEqual([
+      'serves on localhost and injects the overlay',
+      'poll returns feedback plus a session-ended signal',
+    ]);
+  });
+
+  it('skips wrapped prose continuation lines (only the marker line is a criterion)', () => {
+    const spec = `2. ACCEPTANCE CRITERIA
+1. \`kaya export\` emits one self-contained file
+   that renders offline
+
+3. NOTES`;
+    expect(extractCriteria(spec)).toEqual(['`kaya export` emits one self-contained file']);
+  });
+});
 
 describe('runSpecVerify', () => {
   it('calls sendWithTools with correct system prompt', async () => {
