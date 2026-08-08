@@ -1,0 +1,22 @@
+{
+  "name": "kaya-editor",
+  "version": "0.1.0",
+  "description": "Self-owned local HTML review editor",
+  "type": "module",
+  "bin": {
+    "kaya": "./bin/kaya.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "bin",
+    "src",
+    "vendor",
+    ".nvmrc"
+  ],
+  "scripts": {
+    "test": "vitest run test"
+  },
+  "license": "MIT"
+}

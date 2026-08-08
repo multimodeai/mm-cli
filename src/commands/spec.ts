@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import { ClaudeClient } from '../engine/claude-client.js';
 import { StdinIO } from '../engine/stdin-io.js';
 import { runInterview } from '../engine/interview.js';
-import { runLavishReview } from '../engine/lavish-review.js';
+import { runKayaReview, runLavishReview } from '../engine/lavish-review.js';
 import { SPEC_NEW, SPEC_QA, SPEC_DECOMPOSE } from '../engine/interview-templates.js';
 import { loadConfig, getApiKey, DEFAULT_MODEL } from '../util/config.js';
 import { registerVerifyCommand } from '../verify/command.js';
@@ -31,6 +31,7 @@ export function registerSpec(program: Command): void {
     .option('--dry-run', 'Print messages without calling API')
     .option('--fresh', 'Start from scratch even if output file exists')
     .option('--no-review', 'Skip the Lavish review step after generation (default type only)')
+    .option('--kaya', 'Use the in-repo Kaya review surface instead of Lavish')
     .action(async (name: string | undefined, opts) => {
       const template = SPEC_TYPES[opts.type];
       if (!template) {
@@ -70,7 +71,8 @@ export function registerSpec(program: Command): void {
         });
 
         if (isOneShot && !opts.dryRun && opts.review !== false && result.artifact) {
-          await runLavishReview(outputFile, client, template.artifactStartMarker);
+          const useKaya = Boolean(opts.kaya || process.env.MM_REVIEW_ENGINE === 'kaya');
+          await (useKaya ? runKayaReview : runLavishReview)(outputFile, client, template.artifactStartMarker);
         }
       } catch (err: any) {
         console.error(chalk.red(`\n✗ ${err.message}`));
