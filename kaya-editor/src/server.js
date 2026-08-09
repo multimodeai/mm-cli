@@ -1,9 +1,9 @@
 import { createServer } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
-import { injectOverlay } from './overlay.js';
+import { injectOverlay, injectBaseTheme } from './overlay.js';
 import { removeRegistry, writeRegistry } from './registry.js';
-import { injectMermaidRuntime } from './mermaid.js';
+import { injectMermaidRuntime, mermaidRuntime } from './mermaid.js';
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -74,6 +74,9 @@ export class KayaReviewServer {
   }
 
   notify() {
+    // Nobody is polling right now: keep the queue intact so the NEXT poll drains
+    // it. Splicing here would silently drop feedback sent between polls.
+    if (!this.waiters.size) return;
     if (!this.queue.length && !this.ended) return;
     const result = { feedback: this.queue.splice(0), ended: this.ended };
     for (const waiter of this.waiters) waiter(result);
@@ -89,6 +92,10 @@ export class KayaReviewServer {
   async handle(request, response) {
     const url = new URL(request.url || '/', this.address());
     if (url.pathname === '/__kaya/health') return json(response, 200, { ok: true, file: this.file });
+    if (url.pathname === '/__kaya/mermaid-runtime.js') {
+      response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+      return response.end(mermaidRuntime());
+    }
     if (url.pathname === '/__kaya/state' && request.method === 'GET') return json(response, 200, { agentReply: this.agentReply, ended: this.ended, queued: this.queue.length });
     if (url.pathname === '/__kaya/poll' && request.method === 'GET') {
       const result = await this.poll(url.searchParams.get('agent_reply') || undefined);
@@ -126,7 +133,7 @@ export class KayaReviewServer {
     const type = MIME_TYPES[extname(requested).toLowerCase()] || 'application/octet-stream';
     response.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
     response.end(requested === this.file && /\.html?$/i.test(requested)
-      ? injectOverlay(injectMermaidRuntime(content.toString('utf8')))
+      ? injectMermaidRuntime(injectOverlay(injectBaseTheme(content.toString('utf8'))))
       : content);
   }
 }

@@ -69,7 +69,7 @@ function renderDocument(source) {
   const html = `<!doctype html><meta charset="utf-8"><body><div id="kaya-export-target"></div><script src="${runtimeUrl}"></script><script>
 (async () => {
   try {
-    mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', deterministicIds: true, deterministicIDSeed: 'kaya' });
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', look: 'handDrawn', handDrawnSeed: 1, theme: 'dark', deterministicIds: true, deterministicIDSeed: 'kaya' });
     const source = decodeURIComponent(Array.from(atob('${sourceBase64}'), (char) => '%' + char.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
     const result = await mermaid.render('kaya-export-diagram', source);
     document.getElementById('kaya-export-target').innerHTML = '<!--KAYA_SVG_BEGIN-->' + result.svg + '<!--KAYA_SVG_END-->';
@@ -122,9 +122,9 @@ export function mermaidRuntime() {
 }
 
 export function mermaidRuntimeMarkup() {
-  return `<script data-kaya-mermaid-runtime="${VERSION}">${mermaidRuntime()}</script><script data-kaya-mermaid-init="${VERSION}">
+  return `<style data-kaya-mermaid-style>.mermaid,[data-kaya-mermaid-source]{max-width:52%;margin-left:auto;margin-right:auto;}.mermaid svg,[data-kaya-mermaid-source] svg{max-width:100%;height:auto;}</style><script data-kaya-mermaid-runtime="${VERSION}" src="/__kaya/mermaid-runtime.js"></script><script data-kaya-mermaid-init="${VERSION}">
 (() => {
-  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', look: 'handDrawn', handDrawnSeed: 1, theme: 'dark' });
   mermaid.run({ querySelector: '.mermaid' });
 })();
 </script>`;
@@ -132,6 +132,9 @@ export function mermaidRuntimeMarkup() {
 
 export function injectMermaidRuntime(html) {
   if (!/class=["'][^"']*\bmermaid\b[^"']*["']/i.test(html) || /data-kaya-mermaid-runtime=/i.test(html)) return html;
+  // If the artifact already ships its own Mermaid, do not inject a second one -
+  // two runtimes racing on the same .mermaid nodes leaves the diagram blank.
+  if (/import\s+mermaid|mermaid@\d|mermaid\.(initialize|run)\s*\(/i.test(html)) return html;
   const markup = mermaidRuntimeMarkup();
   return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, `${markup}</body>`) : `${html}\n${markup}`;
 }

@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { exportHtml } from './export.js';
 import { startKayaServer } from './server.js';
 import { listRegistries, readRegistry } from './registry.js';
@@ -102,4 +102,14 @@ export async function main(args) {
     case 'stop': return stop();
     default: return open(args[0]);
   }
+}
+
+// When executed directly - notably the detached `node cli.js --server <file>`
+// child spawned by open() - run main. When imported by bin/kaya.js it stays
+// dormant, so there is exactly one main() invocation per process.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main(process.argv.slice(2)).catch((error) => {
+    console.error(`kaya: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  });
 }
