@@ -50,6 +50,7 @@ export class KayaReviewServer {
     this.ended = false;
     this.clients = new Map();
     this.primary = null;
+    this.history = [];
   }
 
   start() {
@@ -88,6 +89,9 @@ export class KayaReviewServer {
   }
 
   poll(agentReply) {
+    if (typeof agentReply === 'string' && agentReply && agentReply !== this.agentReply) {
+      this.history.push({ role: 'agent', text: agentReply });
+    }
     if (typeof agentReply === 'string') this.agentReply = agentReply;
     if (this.queue.length || this.ended) return Promise.resolve({ feedback: this.queue.splice(0), ended: this.ended });
     return new Promise((resolvePoll) => {
@@ -128,7 +132,7 @@ export class KayaReviewServer {
       if (cid) this.clients.set(cid, now);
       for (const [id, t] of this.clients) if (now - t > 6000) this.clients.delete(id);
       if (!this.primary || !this.clients.has(this.primary)) this.primary = this.clients.keys().next().value || null;
-      return json(response, 200, { agentReply: this.agentReply, ended: this.ended, queued: this.queue.length, clients: this.clients.size, primary: this.primary });
+      return json(response, 200, { agentReply: this.agentReply, ended: this.ended, queued: this.queue.length, clients: this.clients.size, primary: this.primary, history: this.history });
     }
     if (url.pathname === '/__kaya/claim' && request.method === 'POST') {
       const cid = url.searchParams.get('client');
@@ -149,6 +153,7 @@ export class KayaReviewServer {
         const item = { text: data.text.trim(), tag: data.tag || 'comment', selector: data.selector || undefined, selectedText: data.selectedText || undefined, createdAt: new Date().toISOString() };
         item.rawText = `[${item.tag}]${item.selector ? ` ${item.selector}` : ''}${item.selectedText ? `\nSelected: ${item.selectedText}` : ''}\n${item.text}`;
         this.queue.push(item);
+        this.history.push({ role: 'you', text: item.text, ref: data.ref || item.selectedText || null });
         this.notify();
         return json(response, 202, { queued: true });
       } catch (error) { return json(response, 400, { error: error instanceof Error ? error.message : 'invalid JSON' }); }

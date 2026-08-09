@@ -24,3 +24,6 @@ scripts/
 
 # lavish skill scratch (internal planning artifacts, mm-cli is a public repo)
 .lavish/
+
+# Cloudflare Wrangler local state
+.wrangler/

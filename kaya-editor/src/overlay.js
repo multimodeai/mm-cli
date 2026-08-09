@@ -144,13 +144,17 @@ export const OVERLAY_SCRIPT = `
   }
   pendingEl.addEventListener('click', function(e){ const i=e.target && e.target.getAttribute && e.target.getAttribute('data-i'); if(i!=null){ state.queued.splice(Number(i),1); renderPending(); } });
 
-  function addMsg(who, text, ref){
-    const empty=logEl.querySelector('.kaya-empty'); if(empty) empty.remove();
-    const el=document.createElement('div'); el.className='kaya-msg '+who;
-    let label = who==='agent' ? 'Agent' : 'You';
-    if(who==='agent'){ state.round=(state.round||0)+1; label += ' <span class="kaya-round">Round '+state.round+'</span>'; }
-    el.innerHTML='<span class="kaya-who">'+label+'</span>'+(ref?'<span class="kaya-ref">'+esc(ref)+'</span>':'')+esc(text);
-    logEl.appendChild(el); logEl.scrollTop=logEl.scrollHeight;
+  let historyKey='';
+  function renderHistory(hist){
+    const key=hist.length+':'+(hist.length?(hist[hist.length-1].text||'').length:0);
+    if(key===historyKey) return; historyKey=key;
+    if(!hist.length){ logEl.innerHTML='<div class="kaya-empty">No messages yet.<br>Flip on <b>Annotate</b>, click a box or select some text, add a note, then <b>Send to Agent</b>.</div>'; return; }
+    let round=0, out='';
+    for(let k=0;k<hist.length;k++){ const m=hist[k];
+      if(m.role==='agent'){ round++; out+='<div class="kaya-msg agent"><span class="kaya-who">Agent <span class="kaya-round">Round '+round+'</span></span>'+esc(m.text)+'</div>'; }
+      else { out+='<div class="kaya-msg you"><span class="kaya-who">You</span>'+(m.ref?'<span class="kaya-ref">'+esc(m.ref)+'</span>':'')+esc(m.text)+'</div>'; }
+    }
+    logEl.innerHTML=out; logEl.scrollTop=logEl.scrollHeight;
   }
 
   async function send(){
@@ -158,12 +162,13 @@ export const OVERLAY_SCRIPT = `
     if(msg){ state.queued.push({ ref:null, note:msg, display:msg, agentText:msg }); composerInput.value=''; }
     const items=state.queued.splice(0); renderPending();
     for(let k=0;k<items.length;k++){ const it=items[k];
-      try{ await fetch(base+'/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({ text: it.agentText, tag:'comment', selector: it.selector, selectedText: it.selectedText })}); addMsg('you', it.display||it.agentText, it.ref); }
+      try{ await fetch(base+'/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({ text: it.agentText, tag:'comment', selector: it.selector, selectedText: it.selectedText, ref: it.ref||null })}); }
       catch(_e){ state.queued.unshift(it); renderPending(); return; }
     }
+    refresh();
   }
   q('[data-send]').addEventListener('click', function(){ send(); });
-  q('[data-end]').addEventListener('click', async function(){ await send(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; addMsg('agent','Review session ended.'); }catch(_e){} });
+  q('[data-end]').addEventListener('click', async function(){ await send(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; refresh(); }catch(_e){} });
   composerInput.addEventListener('keydown', function(e){ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); send(); } });
 
   // ---- navbar overflow menu ----
@@ -178,7 +183,7 @@ export const OVERLAY_SCRIPT = `
   nav.querySelector('[data-menu-reload]').addEventListener('click', function(){ closeMenu(); window.location.reload(); });
   nav.querySelector('[data-menu-copy]').addEventListener('click', function(){ closeMenu(); if(navigator.clipboard && filePath) navigator.clipboard.writeText(filePath); });
   nav.querySelector('[data-menu-export]').addEventListener('click', function(){ closeMenu(); const a=document.createElement('a'); a.href=base+'/export'; a.download=''; document.body.appendChild(a); a.click(); a.remove(); });
-  nav.querySelector('[data-menu-end]').addEventListener('click', async function(){ closeMenu(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; addMsg('agent','Review session ended.'); }catch(_e){} });
+  nav.querySelector('[data-menu-end]').addEventListener('click', async function(){ closeMenu(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; refresh(); }catch(_e){} });
 
   // ---- multi-tab awareness ----
   const bannerEl = q('[data-otherbanner]');
@@ -193,7 +198,7 @@ export const OVERLAY_SCRIPT = `
   logEl.innerHTML='<div class="kaya-empty">No messages yet.<br>Flip on <b>Annotate</b>, click a box or select some text, add a note, then <b>Send to Agent</b>.</div>';
   async function refresh(){
     try{ const r=await fetch(base+'/state?client='+clientId); if(!r.ok) return; const d=await r.json();
-      if(d.agentReply && d.agentReply!==state.lastReply){ state.lastReply=d.agentReply; addMsg('agent', d.agentReply); }
+      renderHistory(d.history||[]);
       state.ended=Boolean(d.ended);
       bannerEl.classList.toggle('kaya-show', (d.clients||1) > 1 && !!d.primary && d.primary!==clientId);
     } catch(_e){}

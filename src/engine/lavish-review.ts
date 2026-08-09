@@ -123,21 +123,21 @@ export async function runKayaReview(
     // don't revise the spec against nothing.
     const feedbackText = pollOutput.replace(/session_ended:[\s\S]*$/, '').trim();
     if (!feedbackText) {
-      agentReply = 'Still here - annotate anything and Send to Agent when ready.';
       continue;
     }
 
     console.log(chalk.dim('\nApplying your Kaya feedback...'));
     const currentContent = readFileSync(outputFile, 'utf-8');
-    const revisionPrompt = `Here is the current specification:\n\n---\n${currentContent}\n---\n\nHere is the raw feedback from the Kaya review session (it references specific parts of the document by their text - read it and figure out what the user wants changed):\n\n---\n${pollOutput}\n---\n\nRevise the FULL specification to address this feedback. Output the complete updated specification, starting with the "=== PROJECT SPECIFICATION ===" marker line - never a diff or partial update.`;
+    const revisionPrompt = `Here is the current specification:\n\n---\n${currentContent}\n---\n\nHere is the raw feedback from the Kaya review session (it references specific parts of the document by their text - read it and figure out what the user wants changed):\n\n---\n${pollOutput}\n---\n\nFirst write one line starting with "SUMMARY: " telling the reviewer, in 1-2 plain sentences, what you changed this round and why. Then a blank line, then the complete updated specification starting with the "=== PROJECT SPECIFICATION ===" marker line - never a diff or partial update.`;
 
     const revised = await client.send(
-      'You are revising a specification document based on structured review feedback from a Kaya session. Always output the COMPLETE revised document, never a diff or partial update. Keep the "=== PROJECT SPECIFICATION ===" marker as the first line.',
+      'You are revising a specification document based on structured review feedback from a Kaya session. Begin with a single "SUMMARY: ..." line describing what changed this round, then a blank line, then the COMPLETE revised document starting with the "=== PROJECT SPECIFICATION ===" marker. Never output a diff or partial update.',
       [{ role: 'user', content: revisionPrompt }],
       16000
     );
 
     writeArtifact(outputFile, revised, artifactStartMarker);
-    agentReply = 'Applied your feedback and updated the spec. Let me know if anything else needs changing.';
+    const summary = revised.split(/===\s*PROJECT SPECIFICATION/i)[0].replace(/^\s*SUMMARY:\s*/i, '').trim();
+    agentReply = summary || 'Applied your feedback and updated the spec.';
   }
 }
