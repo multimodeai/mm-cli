@@ -5,6 +5,7 @@ export const OVERLAY_SCRIPT = `
   const base = '${KAYA_PREFIX}';
   const html = document.documentElement;
   const state = { annotate:false, queued:[], ended:false, lastReply:'', suppressClick:false, ctx:null, ref:null };
+  const clientId = 'c' + Math.random().toString(36).slice(2, 12);
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function clip(s,n){ s=String(s==null?'':s).replace(/\\s+/g,' ').trim(); return s.length>n ? s.slice(0,n)+'\\u2026' : s; }
 
@@ -35,6 +36,7 @@ export const OVERLAY_SCRIPT = `
   convo.innerHTML = '<div class="kaya-convo-head"><span class="kaya-convo-title">Conversation</span><span class="kaya-count" data-count>0</span></div>'
     + '<div class="kaya-log" data-log data-kaya-reply></div>'
     + '<div class="kaya-pending" data-pending></div>'
+    + '<div class="kaya-otherbanner" data-otherbanner>This review is open in another tab. <button data-takeover>Take over here</button></div>'
     + '<div class="kaya-composer"><textarea data-input placeholder="Write a message for the agent..."></textarea>'
     + '<div class="kaya-send-row"><button class="kaya-btn-primary" data-send>Send to Agent</button><button class="kaya-btn-ghost" data-end>Send &amp; End</button></div></div>';
 
@@ -178,6 +180,10 @@ export const OVERLAY_SCRIPT = `
   nav.querySelector('[data-menu-export]').addEventListener('click', function(){ closeMenu(); const a=document.createElement('a'); a.href=base+'/export'; a.download=''; document.body.appendChild(a); a.click(); a.remove(); });
   nav.querySelector('[data-menu-end]').addEventListener('click', async function(){ closeMenu(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; addMsg('agent','Review session ended.'); }catch(_e){} });
 
+  // ---- multi-tab awareness ----
+  const bannerEl = q('[data-otherbanner]');
+  bannerEl.querySelector('[data-takeover]').addEventListener('click', function(){ fetch(base+'/claim?client='+clientId,{method:'POST'}).catch(function(){}); bannerEl.classList.remove('kaya-show'); });
+
   window.kaya = {
     queuePrompt: function(prompt, opts){ opts=opts||{}; addQueued({ ref:null, note:prompt, display: opts.text || prompt, agentText: prompt, selector: opts.selector||null, selectedText: opts.selectedText||null }); },
     sendQueuedPrompts: function(){ send(); }
@@ -186,9 +192,10 @@ export const OVERLAY_SCRIPT = `
 
   logEl.innerHTML='<div class="kaya-empty">No messages yet.<br>Flip on <b>Annotate</b>, click a box or select some text, add a note, then <b>Send to Agent</b>.</div>';
   async function refresh(){
-    try{ const r=await fetch(base+'/state'); if(!r.ok) return; const d=await r.json();
+    try{ const r=await fetch(base+'/state?client='+clientId); if(!r.ok) return; const d=await r.json();
       if(d.agentReply && d.agentReply!==state.lastReply){ state.lastReply=d.agentReply; addMsg('agent', d.agentReply); }
       state.ended=Boolean(d.ended);
+      bannerEl.classList.toggle('kaya-show', (d.clients||1) > 1 && !!d.primary && d.primary!==clientId);
     } catch(_e){}
   }
   refresh(); window.setInterval(refresh, 1200);

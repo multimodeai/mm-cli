@@ -81,4 +81,7 @@ html.kaya-annotate { cursor:crosshair; }
 #kaya-nav .kaya-menu-danger { color:#e5766a; }
 #kaya-nav .kaya-menu-danger:hover { background:rgba(229,118,106,.14); }
 #kaya-convo .kaya-msg .kaya-who .kaya-round { margin-left:7px; padding:1px 7px; border-radius:999px; background:rgba(199,91,63,.18); color:var(--kt2); font-size:9px; letter-spacing:.06em; }
+#kaya-convo .kaya-otherbanner { display:none; align-items:center; justify-content:space-between; gap:10px; margin:0 14px 10px; padding:9px 12px; border:1px solid rgba(224,176,98,.4); border-radius:9px; background:rgba(224,176,98,.1); color:#e0b062; font-size:12px; line-height:1.35; }
+#kaya-convo .kaya-otherbanner.kaya-show { display:flex; }
+#kaya-convo .kaya-otherbanner button { border:0; background:transparent; color:#e0b062; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; text-decoration:underline; padding:0; }
 `;

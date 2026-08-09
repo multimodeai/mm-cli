@@ -48,6 +48,8 @@ export class KayaReviewServer {
     this.waiters = new Set();
     this.agentReply = '';
     this.ended = false;
+    this.clients = new Map();
+    this.primary = null;
   }
 
   start() {
@@ -120,7 +122,19 @@ export class KayaReviewServer {
       });
       return response.end(html);
     }
-    if (url.pathname === '/__kaya/state' && request.method === 'GET') return json(response, 200, { agentReply: this.agentReply, ended: this.ended, queued: this.queue.length });
+    if (url.pathname === '/__kaya/state' && request.method === 'GET') {
+      const now = Date.now();
+      const cid = url.searchParams.get('client');
+      if (cid) this.clients.set(cid, now);
+      for (const [id, t] of this.clients) if (now - t > 6000) this.clients.delete(id);
+      if (!this.primary || !this.clients.has(this.primary)) this.primary = this.clients.keys().next().value || null;
+      return json(response, 200, { agentReply: this.agentReply, ended: this.ended, queued: this.queue.length, clients: this.clients.size, primary: this.primary });
+    }
+    if (url.pathname === '/__kaya/claim' && request.method === 'POST') {
+      const cid = url.searchParams.get('client');
+      if (cid) this.primary = cid;
+      return json(response, 200, { primary: this.primary });
+    }
     if (url.pathname === '/__kaya/poll' && request.method === 'GET') {
       const result = await this.poll(url.searchParams.get('agent_reply') || undefined);
       const feedback = result.feedback.map((item) => item.rawText).join('\n\n');
