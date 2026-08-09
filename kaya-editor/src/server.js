@@ -4,6 +4,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { injectOverlay, injectBaseTheme } from './overlay.js';
 import { removeRegistry, writeRegistry } from './registry.js';
 import { injectMermaidRuntime, mermaidRuntime } from './mermaid.js';
+import { markdownDocument } from './markdown.js';
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -130,6 +131,11 @@ export class KayaReviewServer {
     const requested = url.pathname === '/' ? this.file : safeAssetPath(this.root, url.pathname);
     if (!requested || !existsSync(requested) || !statSync(requested).isFile()) return json(response, 404, { error: 'asset not found' });
     const content = readFileSync(requested);
+    if (requested === this.file && /\.(md|markdown)$/i.test(requested)) {
+      const doc = injectMermaidRuntime(injectOverlay(markdownDocument(content.toString('utf8'), basename(this.file))));
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+      return response.end(doc);
+    }
     const type = MIME_TYPES[extname(requested).toLowerCase()] || 'application/octet-stream';
     response.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
     response.end(requested === this.file && /\.html?$/i.test(requested)
