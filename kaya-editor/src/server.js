@@ -87,7 +87,16 @@ export class KayaReviewServer {
   poll(agentReply) {
     if (typeof agentReply === 'string') this.agentReply = agentReply;
     if (this.queue.length || this.ended) return Promise.resolve({ feedback: this.queue.splice(0), ended: this.ended });
-    return new Promise((resolvePoll) => this.waiters.add(resolvePoll));
+    return new Promise((resolvePoll) => {
+      this.waiters.add(resolvePoll);
+      // Bounded long-poll: resolve with an empty keep-alive well inside the
+      // client's fetch/header timeout so the agent just re-polls instead of
+      // erroring on a connection that was held open too long.
+      const timer = setTimeout(() => {
+        if (this.waiters.delete(resolvePoll)) resolvePoll({ feedback: [], ended: this.ended });
+      }, 25000);
+      if (timer.unref) timer.unref();
+    });
   }
 
   async handle(request, response) {

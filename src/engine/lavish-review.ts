@@ -119,6 +119,14 @@ export async function runKayaReview(
       return;
     }
 
+    // A bounded poll returns a keep-alive with no feedback text - just re-poll,
+    // don't revise the spec against nothing.
+    const feedbackText = pollOutput.replace(/session_ended:[\s\S]*$/, '').trim();
+    if (!feedbackText) {
+      agentReply = 'Still here - annotate anything and Send to Agent when ready.';
+      continue;
+    }
+
     console.log(chalk.dim('\nApplying your Kaya feedback...'));
     const currentContent = readFileSync(outputFile, 'utf-8');
     const revisionPrompt = `Here is the current specification:\n\n---\n${currentContent}\n---\n\nHere is the raw feedback from the Kaya review session (it references specific parts of the document by their text - read it and figure out what the user wants changed):\n\n---\n${pollOutput}\n---\n\nRevise the FULL specification to address this feedback. Output the complete updated specification, starting with the "=== PROJECT SPECIFICATION ===" marker line - never a diff or partial update.`;
