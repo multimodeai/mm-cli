@@ -5,14 +5,19 @@ A CLI that turns AI prompting from guesswork into engineering. Define what you w
 ## Install
 
 ```bash
-git clone https://github.com/multimodeai/mm-cli.git
-cd mm-cli
-npm install
-npm run build
-npm link   # installs 'mm' globally
+npm i -g mm-cli   # installs both `mm` and `kaya` globally
 ```
 
-Requires Node.js 18+ and a Claude API key or OAuth token:
+Or from source:
+
+```bash
+git clone https://github.com/multimodeai/mm-cli.git
+cd mm-cli
+npm install && npm run build
+npm link          # installs `mm` and `kaya` globally
+```
+
+Requires Node.js 22+ and a Claude API key or OAuth token:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-api-...
@@ -57,6 +62,34 @@ mm eval compare <skill>               # See the delta
 ```
 
 A/B test your AI output with and without context engineering. Multi-axis 5-dimension scoring.
+
+## KAYA — review artifacts in the browser
+
+`mm` ships with **KAYA**, a self-contained review surface for the documents it
+produces (and any HTML or Markdown artifact). Open a file, read it rendered on a
+dark themed page, toggle **Annotate** to attach comments to specific passages,
+and send the batch back to the agent. The agent/you conversation persists across
+rounds, so you see exactly what changed each iteration.
+
+```bash
+kaya path/to/plan.md         # open a review surface at a local URL
+kaya path/to/report.html     # HTML artifacts work too
+kaya export path/to/file     # write a self-contained offline .html (assets inlined)
+kaya end path/to/file        # close the review and release the agent
+kaya stop                    # stop the running server
+```
+
+KAYA runs entirely on your machine — a dependency-free Node server with vendored
+render assets, no network calls, no third-party host. Diagrams render as
+hand-drawn dark Mermaid, and the offline export inlines every asset into one file
+you can host anywhere.
+
+Use it inside the spec loop to review and revise through the browser instead of
+the terminal:
+
+```bash
+mm spec new <feature> --kaya    # or: MM_REVIEW_ENGINE=kaya
+```
 
 ## All Commands
 
@@ -104,7 +137,7 @@ Claude reads your code before asking questions, and searches arxiv/docs when res
 ## Global Flags
 
 ```
---model <model>    Override Claude model (default: claude-sonnet-4-6)
+--model <model>    Override Claude model (default: claude-sonnet-4-20250514)
 --dry-run          Print system prompt without calling API
 --fresh            Ignore existing output file, start from scratch
 ```
@@ -145,4 +178,9 @@ Skills + evals = measurable improvement in AI output quality.
 
 ## License
 
-AGPL-3.0 — Free to use, modify, and distribute. If you build a hosted service on mm's methodology, you must open-source the service code. See [LICENSE](LICENSE) for details.
+FSL-1.1-MIT (Functional Source License) — free to use, modify, and distribute for
+any purpose except building a competing product. Each version converts to plain
+MIT two years after its release. See [LICENSE.md](LICENSE.md) for the full terms.
+
+KAYA's vendored render libraries (DaisyUI, Tailwind, Mermaid) keep their own MIT
+licenses — see [kaya-editor/vendor/THIRD-PARTY.md](kaya-editor/vendor/THIRD-PARTY.md).
