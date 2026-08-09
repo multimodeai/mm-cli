@@ -69,4 +69,16 @@ html.kaya-annotate { cursor:crosshair; }
 #kaya-convo .kaya-btn-primary:hover { background:#b34e35; }
 #kaya-convo .kaya-btn-ghost { height:39px; padding:0 14px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--muted); font-size:12.5px; font-weight:600; cursor:pointer; }
 #kaya-convo .kaya-btn-ghost:hover { background:rgba(255,255,255,.05); color:var(--ink); }
+#kaya-nav .kaya-nav-right { display:flex; align-items:center; gap:6px; }
+#kaya-nav .kaya-menuwrap { position:relative; }
+#kaya-nav .kaya-menubtn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border:0; border-radius:9px; background:transparent; color:var(--muted); font-size:22px; line-height:1; cursor:pointer; }
+#kaya-nav .kaya-menubtn:hover { background:rgba(255,255,255,.06); color:var(--ink); }
+#kaya-nav .kaya-menu { position:absolute; top:calc(100% + 6px); right:0; min-width:216px; display:none; flex-direction:column; padding:6px; background:var(--bg); border:1px solid var(--line); border-radius:11px; box-shadow:0 16px 40px rgba(0,0,0,.55); }
+#kaya-nav .kaya-menu.kaya-open { display:flex; }
+#kaya-nav .kaya-menu-file { padding:7px 10px 8px; margin-bottom:4px; border-bottom:1px solid var(--line); font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#kaya-nav .kaya-menu-item { display:block; width:100%; text-align:left; padding:8px 10px; border:0; border-radius:7px; background:transparent; color:var(--ink); font-size:13px; font-weight:500; cursor:pointer; }
+#kaya-nav .kaya-menu-item:hover { background:rgba(255,255,255,.07); }
+#kaya-nav .kaya-menu-danger { color:#e5766a; }
+#kaya-nav .kaya-menu-danger:hover { background:rgba(229,118,106,.14); }
+#kaya-convo .kaya-msg .kaya-who .kaya-round { margin-left:7px; padding:1px 7px; border-radius:999px; background:rgba(199,91,63,.18); color:var(--kt2); font-size:9px; letter-spacing:.06em; }
 `;

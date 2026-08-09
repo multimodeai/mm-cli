@@ -12,7 +12,16 @@ export const OVERLAY_SCRIPT = `
 
   const nav = document.createElement('header'); nav.id='kaya-nav'; nav.setAttribute('aria-label','Multimode Kaya Editor review');
   nav.innerHTML = '<div class="kaya-brandwrap"><span class="kaya-brand">Kaya</span><span class="kaya-brand-sub">Editor</span></div>'
-    + '<label class="kaya-toggle"><input type="checkbox" data-kaya-annotate><span class="kaya-switch"></span>Annotate</label>';
+    + '<div class="kaya-nav-right">'
+    + '<label class="kaya-toggle"><input type="checkbox" data-kaya-annotate><span class="kaya-switch"></span>Annotate</label>'
+    + '<div class="kaya-menuwrap"><button class="kaya-menubtn" data-menu-btn aria-label="Menu">\\u22ee</button>'
+    + '<div class="kaya-menu" data-menu>'
+    + '<div class="kaya-menu-file" data-menu-file>artifact</div>'
+    + '<button class="kaya-menu-item" data-menu-reload>Reload artifact</button>'
+    + '<button class="kaya-menu-item" data-menu-copy>Copy file path</button>'
+    + '<button class="kaya-menu-item" data-menu-export>Export standalone HTML</button>'
+    + '<button class="kaya-menu-item kaya-menu-danger" data-menu-end>End session</button>'
+    + '</div></div></div>';
 
   const hl = document.createElement('div'); hl.id='kaya-hl';
 
@@ -136,7 +145,9 @@ export const OVERLAY_SCRIPT = `
   function addMsg(who, text, ref){
     const empty=logEl.querySelector('.kaya-empty'); if(empty) empty.remove();
     const el=document.createElement('div'); el.className='kaya-msg '+who;
-    el.innerHTML='<span class="kaya-who">'+(who==='agent'?'Agent':'You')+'</span>'+(ref?'<span class="kaya-ref">'+esc(ref)+'</span>':'')+esc(text);
+    let label = who==='agent' ? 'Agent' : 'You';
+    if(who==='agent'){ state.round=(state.round||0)+1; label += ' <span class="kaya-round">Round '+state.round+'</span>'; }
+    el.innerHTML='<span class="kaya-who">'+label+'</span>'+(ref?'<span class="kaya-ref">'+esc(ref)+'</span>':'')+esc(text);
     logEl.appendChild(el); logEl.scrollTop=logEl.scrollHeight;
   }
 
@@ -152,6 +163,20 @@ export const OVERLAY_SCRIPT = `
   q('[data-send]').addEventListener('click', function(){ send(); });
   q('[data-end]').addEventListener('click', async function(){ await send(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; addMsg('agent','Review session ended.'); }catch(_e){} });
   composerInput.addEventListener('keydown', function(e){ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); send(); } });
+
+  // ---- navbar overflow menu ----
+  const menu = nav.querySelector('[data-menu]');
+  const menuWrap = nav.querySelector('.kaya-menuwrap');
+  const menuFileEl = nav.querySelector('[data-menu-file]');
+  let filePath = '';
+  fetch(base+'/health').then(function(r){ return r.json(); }).then(function(d){ filePath=d.file||''; if(menuFileEl) menuFileEl.textContent = (filePath.split('/').pop()) || 'artifact'; }).catch(function(){});
+  function closeMenu(){ menu.classList.remove('kaya-open'); }
+  nav.querySelector('[data-menu-btn]').addEventListener('click', function(){ menu.classList.toggle('kaya-open'); });
+  document.addEventListener('mousedown', function(e){ if(!menuWrap.contains(e.target)) closeMenu(); }, true);
+  nav.querySelector('[data-menu-reload]').addEventListener('click', function(){ closeMenu(); window.location.reload(); });
+  nav.querySelector('[data-menu-copy]').addEventListener('click', function(){ closeMenu(); if(navigator.clipboard && filePath) navigator.clipboard.writeText(filePath); });
+  nav.querySelector('[data-menu-export]').addEventListener('click', function(){ closeMenu(); const a=document.createElement('a'); a.href=base+'/export'; a.download=''; document.body.appendChild(a); a.click(); a.remove(); });
+  nav.querySelector('[data-menu-end]').addEventListener('click', async function(){ closeMenu(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; addMsg('agent','Review session ended.'); }catch(_e){} });
 
   window.kaya = {
     queuePrompt: function(prompt, opts){ opts=opts||{}; addQueued({ ref:null, note:prompt, display: opts.text || prompt, agentText: prompt, selector: opts.selector||null, selectedText: opts.selectedText||null }); },

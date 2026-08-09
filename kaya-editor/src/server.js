@@ -5,6 +5,7 @@ import { injectOverlay, injectBaseTheme } from './overlay.js';
 import { removeRegistry, writeRegistry } from './registry.js';
 import { injectMermaidRuntime, mermaidRuntime } from './mermaid.js';
 import { markdownDocument } from './markdown.js';
+import { inlineAssets } from './export.js';
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -105,6 +106,19 @@ export class KayaReviewServer {
     if (url.pathname === '/__kaya/mermaid-runtime.js') {
       response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
       return response.end(mermaidRuntime());
+    }
+    if (url.pathname === '/__kaya/export') {
+      const raw = readFileSync(this.file, 'utf8');
+      const isMd = /\.(md|markdown)$/i.test(this.file);
+      const source = isMd ? markdownDocument(raw, basename(this.file)) : raw;
+      const html = await inlineAssets(source, this.file);
+      const name = basename(this.file).replace(/\.(md|markdown|html?)$/i, '') + '.offline.html';
+      response.writeHead(200, {
+        'content-type': 'text/html; charset=utf-8',
+        'content-disposition': `attachment; filename="${name}"`,
+        'cache-control': 'no-store',
+      });
+      return response.end(html);
     }
     if (url.pathname === '/__kaya/state' && request.method === 'GET') return json(response, 200, { agentReply: this.agentReply, ended: this.ended, queued: this.queue.length });
     if (url.pathname === '/__kaya/poll' && request.method === 'GET') {
