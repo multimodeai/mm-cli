@@ -27,3 +27,6 @@ scripts/
 
 # Cloudflare Wrangler local state
 .wrangler/
+
+# Source art for the favicon (baked into favicon.js as a data-URI)
+kaya-favicon.png

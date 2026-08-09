@@ -33,8 +33,9 @@ describe('Kaya HTTP review server', () => {
     const asset = await fetch(`${server.address()}note.txt`);
     expect(page.status).toBe(200);
     const pageText = await page.text();
-    expect(pageText).toContain('Multimode · Kaya');
+    expect(pageText).toContain('Multimode Kaya Editor');
     expect(pageText).toContain('#c75b3f');
+    expect(pageText).toContain('rel="icon"');
     expect((await asset.text())).toBe('sibling asset');
   });
 

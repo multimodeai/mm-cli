@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { injectOverlay, injectBaseTheme } from './overlay.js';
+import { injectFavicon } from './favicon.js';
 import { removeRegistry, writeRegistry } from './registry.js';
 import { injectMermaidRuntime, mermaidRuntime } from './mermaid.js';
 import { markdownDocument } from './markdown.js';
@@ -174,14 +175,14 @@ export class KayaReviewServer {
     if (!requested || !existsSync(requested) || !statSync(requested).isFile()) return json(response, 404, { error: 'asset not found' });
     const content = readFileSync(requested);
     if (requested === this.file && /\.(md|markdown)$/i.test(requested)) {
-      const doc = injectMermaidRuntime(injectOverlay(markdownDocument(content.toString('utf8'), basename(this.file))));
+      const doc = injectFavicon(injectMermaidRuntime(injectOverlay(markdownDocument(content.toString('utf8'), basename(this.file)))));
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       return response.end(doc);
     }
     const type = MIME_TYPES[extname(requested).toLowerCase()] || 'application/octet-stream';
     response.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
     response.end(requested === this.file && /\.html?$/i.test(requested)
-      ? injectMermaidRuntime(injectOverlay(injectBaseTheme(content.toString('utf8'))))
+      ? injectFavicon(injectMermaidRuntime(injectOverlay(injectBaseTheme(content.toString('utf8')))))
       : content);
   }
 }
