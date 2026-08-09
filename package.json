@@ -1,10 +1,11 @@
 {
   "name": "mm-cli",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Developer tool that operationalizes the 4 disciplines of AI input with measurable eval outcomes",
   "type": "module",
   "bin": {
-    "mm": "./dist/index.js"
+    "mm": "./dist/index.js",
+    "kaya": "./kaya-editor/bin/kaya.js"
   },
   "scripts": {
     "build": "tsc",
@@ -20,9 +21,9 @@
     "claude",
     "prompt-engineering"
   ],
-  "license": "AGPL-3.0-only",
+  "license": "FSL-1.1-MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -35,5 +36,11 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
-  }
+  },
+  "files": [
+    "dist",
+    "kaya-editor",
+    "LICENSE.md",
+    "README.md"
+  ]
 }
