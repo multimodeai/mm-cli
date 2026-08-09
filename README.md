@@ -5,7 +5,7 @@ A CLI that turns AI prompting from guesswork into engineering. Define what you w
 ## Install
 
 ```bash
-npm i -g mm-cli   # installs both `mm` and `kaya` globally
+npm i -g mm-kit   # installs both `mm` and `kaya` globally
 ```
 
 Or from source:
