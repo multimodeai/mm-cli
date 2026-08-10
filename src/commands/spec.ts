@@ -25,13 +25,14 @@ export function registerSpec(program: Command): void {
 
   spec
     .command('new [name]')
-    .description('default type: one-shot spec + Lavish review. --type qa/decompose: unchanged multi-phase interview')
+    .description('default type: one-shot spec + Kaya review. --type qa/decompose: unchanged multi-phase interview')
     .option('--model <model>', 'Override Claude model')
     .option('--type <type>', 'Spec type: default, qa, decompose', 'default')
     .option('--dry-run', 'Print messages without calling API')
     .option('--fresh', 'Start from scratch even if output file exists')
-    .option('--no-review', 'Skip the Lavish review step after generation (default type only)')
-    .option('--kaya', 'Use the in-repo Kaya review surface instead of Lavish')
+    .option('--no-review', 'Skip the review step after generation (default type only)')
+    .option('--kaya', 'Use the Kaya review surface (now the default; kept for back-compat)')
+    .option('--lavish', 'Use the Lavish review surface instead of Kaya')
     .action(async (name: string | undefined, opts) => {
       const template = SPEC_TYPES[opts.type];
       if (!template) {
@@ -59,7 +60,7 @@ export function registerSpec(program: Command): void {
         if (isOneShot && !opts.dryRun) {
           console.log(chalk.bold.cyan(`\n${template.name}`));
           console.log(chalk.dim(template.description));
-          console.log(chalk.dim('Describe the whole project in one message — the full picture, however long. No back-and-forth: the spec comes straight back, then you review and refine it in Lavish.\n'));
+          console.log(chalk.dim('Describe the whole project in one message — the full picture, however long. No back-and-forth: the spec comes straight back, then you review and refine it in Kaya.\n'));
           initialInput = await io.prompt();
         }
 
@@ -71,7 +72,8 @@ export function registerSpec(program: Command): void {
         });
 
         if (isOneShot && !opts.dryRun && opts.review !== false && result.artifact) {
-          const useKaya = Boolean(opts.kaya || process.env.MM_REVIEW_ENGINE === 'kaya');
+          // Kaya is the default review surface; opt back into Lavish explicitly.
+          const useKaya = !(opts.lavish || process.env.MM_REVIEW_ENGINE === 'lavish');
           await (useKaya ? runKayaReview : runLavishReview)(outputFile, client, template.artifactStartMarker);
         }
       } catch (err: any) {
