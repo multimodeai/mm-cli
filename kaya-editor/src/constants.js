@@ -58,8 +58,11 @@ html.kaya-annotate { cursor:crosshair; }
 #kaya-convo .kaya-pending:empty { display:none; }
 #kaya-convo .kaya-pitem { display:flex; align-items:flex-start; gap:8px; padding:8px 10px; border-radius:9px; background:var(--bg2); border:1px solid var(--line); font-size:12px; line-height:1.45; }
 #kaya-convo .kaya-pitem .kaya-pi-body { flex:1; min-width:0; }
-#kaya-convo .kaya-pitem .kaya-pi-ref { color:var(--kt2); font-style:italic; overflow-wrap:anywhere; }
-#kaya-convo .kaya-pitem .kaya-pi-note { color:var(--ink); overflow-wrap:anywhere; }
+#kaya-convo .kaya-pitem .kaya-pi-ref { display:none; margin-bottom:4px; color:var(--kt2); font-style:italic; overflow-wrap:anywhere; }
+#kaya-convo .kaya-pitem .kaya-pi-note { color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#kaya-convo .kaya-pitem:hover { background:var(--bg3); }
+#kaya-convo .kaya-pitem:hover .kaya-pi-ref { display:block; }
+#kaya-convo .kaya-pitem:hover .kaya-pi-note { white-space:normal; overflow:visible; overflow-wrap:anywhere; }
 #kaya-convo .kaya-pitem .kaya-pi-x { cursor:pointer; color:var(--muted); font-weight:700; }
 #kaya-convo .kaya-composer { flex:0 0 auto; border-top:1px solid var(--line); padding:12px 14px 14px; background:var(--bg); }
 #kaya-convo .kaya-composer textarea { display:block; width:100%; min-height:56px; max-height:170px; resize:vertical; padding:10px 11px; border:1px solid var(--line); border-radius:10px; background:#000; color:var(--ink); font-size:13px; outline:none; }
