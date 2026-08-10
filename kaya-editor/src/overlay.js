@@ -72,7 +72,11 @@ export const OVERLAY_SCRIPT = `
     return parts.join(' > ')||'body';
   }
   function refFor(el){ const t=clip(el.textContent, 70); return t || ('the '+el.tagName.toLowerCase()+' element'); }
-  function placeHl(rect, lock){ hl.style.display='block'; hl.style.left=rect.left+'px'; hl.style.top=rect.top+'px'; hl.style.width=rect.width+'px'; hl.style.height=rect.height+'px'; hl.classList.toggle('kaya-lock', !!lock); }
+  // Highlight box intentionally removed: covering whole sections was noise. The
+  // annotation target is still tracked internally (selector + ref + selected
+  // text) and shown compactly in the popup + the queued-note list, so the agent
+  // knows exactly what each note refers to without painting over the artifact.
+  function placeHl(){ /* no-op */ }
   function hideHl(){ hl.style.display='none'; hl.classList.remove('kaya-lock'); }
 
   annBox.addEventListener('change', function(){ state.annotate=annBox.checked; html.classList.toggle('kaya-annotate', state.annotate); if(!state.annotate){ hideHl(); closePop(); } });

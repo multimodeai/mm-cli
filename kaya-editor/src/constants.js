@@ -45,7 +45,7 @@ html.kaya-annotate { cursor:crosshair; }
 #kaya-convo .kaya-convo-title { font-size:12px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
 #kaya-convo .kaya-count { min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--kt); color:#fff; font-size:10px; font-weight:700; display:none; align-items:center; justify-content:center; }
 #kaya-convo .kaya-count.kaya-on { display:inline-flex; }
-#kaya-convo .kaya-log { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:11px; }
+#kaya-convo .kaya-log { flex:1 1 0; min-height:0; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:11px; }
 #kaya-convo .kaya-msg { padding:10px 12px; border-radius:11px; font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
 #kaya-convo .kaya-msg .kaya-who { display:block; font-size:9.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; margin-bottom:5px; opacity:.85; }
 #kaya-convo .kaya-msg .kaya-ref { display:block; margin-bottom:6px; padding:5px 8px; border-radius:7px; background:rgba(199,91,63,.14); border-left:2px solid var(--kt); font-size:11.5px; color:var(--kt2); font-style:italic; overflow-wrap:anywhere; }
@@ -54,14 +54,14 @@ html.kaya-annotate { cursor:crosshair; }
 #kaya-convo .kaya-msg.you { background:var(--bg3); }
 #kaya-convo .kaya-msg.you .kaya-who { color:var(--muted); }
 #kaya-convo .kaya-empty { margin:auto; text-align:center; color:var(--muted); font-size:12.5px; line-height:1.55; padding:0 22px; }
-#kaya-convo .kaya-pending { padding:0 14px; display:flex; flex-direction:column; gap:7px; }
+#kaya-convo .kaya-pending { flex:0 1 auto; min-height:0; max-height:30vh; overflow-y:auto; padding:2px 14px; display:flex; flex-direction:column; gap:7px; }
 #kaya-convo .kaya-pending:empty { display:none; }
 #kaya-convo .kaya-pitem { display:flex; align-items:flex-start; gap:8px; padding:8px 10px; border-radius:9px; background:var(--bg2); border:1px solid var(--line); font-size:12px; line-height:1.45; }
 #kaya-convo .kaya-pitem .kaya-pi-body { flex:1; min-width:0; }
 #kaya-convo .kaya-pitem .kaya-pi-ref { color:var(--kt2); font-style:italic; overflow-wrap:anywhere; }
 #kaya-convo .kaya-pitem .kaya-pi-note { color:var(--ink); overflow-wrap:anywhere; }
 #kaya-convo .kaya-pitem .kaya-pi-x { cursor:pointer; color:var(--muted); font-weight:700; }
-#kaya-convo .kaya-composer { border-top:1px solid var(--line); padding:12px 14px 14px; background:var(--bg); }
+#kaya-convo .kaya-composer { flex:0 0 auto; border-top:1px solid var(--line); padding:12px 14px 14px; background:var(--bg); }
 #kaya-convo .kaya-composer textarea { display:block; width:100%; min-height:56px; max-height:170px; resize:vertical; padding:10px 11px; border:1px solid var(--line); border-radius:10px; background:#000; color:var(--ink); font-size:13px; outline:none; }
 #kaya-convo .kaya-composer textarea:focus { border-color:var(--kt); }
 #kaya-convo .kaya-send-row { display:flex; gap:8px; margin-top:10px; }
