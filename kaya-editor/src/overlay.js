@@ -72,11 +72,15 @@ export const OVERLAY_SCRIPT = `
     return parts.join(' > ')||'body';
   }
   function refFor(el){ const t=clip(el.textContent, 70); return t || ('the '+el.tagName.toLowerCase()+' element'); }
-  // Highlight box intentionally removed: covering whole sections was noise. The
-  // annotation target is still tracked internally (selector + ref + selected
-  // text) and shown compactly in the popup + the queued-note list, so the agent
-  // knows exactly what each note refers to without painting over the artifact.
-  function placeHl(){ /* no-op */ }
+  function placeHl(rect, lock){ hl.style.display='block'; hl.style.left=rect.left+'px'; hl.style.top=rect.top+'px'; hl.style.width=rect.width+'px'; hl.style.height=rect.height+'px'; hl.classList.toggle('kaya-lock', !!lock); }
+  // A box around one section is useful; a box that spans every section (a
+  // page-level wrapper, <body>, or an element as tall as the whole document) is
+  // just noise. Treat those as "not a target" so we never highlight the whole page.
+  function coversPage(el, rect){
+    if(el===document.body || el===document.documentElement) return true;
+    const pageH=Math.max(document.documentElement.scrollHeight, window.innerHeight);
+    return rect.height >= pageH*0.85;
+  }
   function hideHl(){ hl.style.display='none'; hl.classList.remove('kaya-lock'); }
 
   annBox.addEventListener('change', function(){ state.annotate=annBox.checked; html.classList.toggle('kaya-annotate', state.annotate); if(!state.annotate){ hideHl(); closePop(); } });
@@ -85,7 +89,9 @@ export const OVERLAY_SCRIPT = `
     if(!state.annotate || pop.classList.contains('kaya-show')) return;
     const el=e.target;
     if(isOurs(el) || !el || el.nodeType!==1){ hideHl(); return; }
-    placeHl(el.getBoundingClientRect(), false);
+    const r=el.getBoundingClientRect();
+    if(coversPage(el, r)){ hideHl(); return; }
+    placeHl(r, false);
   }, true);
 
   document.addEventListener('mouseup', function(){
@@ -105,8 +111,10 @@ export const OVERLAY_SCRIPT = `
     if(!state.annotate || isOurs(e.target)) return;
     if(state.suppressClick){ state.suppressClick=false; return; }
     if(isNative(e.target)) return;
+    const el=e.target; const r=el.getBoundingClientRect();
+    if(coversPage(el, r)) return;  // never annotate the whole page - let the click pass through
     e.preventDefault(); e.stopPropagation();
-    const el=e.target; placeHl(el.getBoundingClientRect(), true);
+    placeHl(r, true);
     openPop(e.clientX, e.clientY, refFor(el), { selector:selectorFor(el) });
   }, true);
 
