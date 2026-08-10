@@ -1,6 +1,6 @@
 {
   "name": "mm-kit",
-  "version": "0.1.0",
+  "version": "0.1.50",
   "description": "Developer tool that operationalizes the 4 disciplines of AI input with measurable eval outcomes",
   "type": "module",
   "bin": {
