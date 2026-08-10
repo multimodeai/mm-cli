@@ -84,10 +84,10 @@ Priority: `CLAUDE_CODE_OAUTH_TOKEN` > `ANTHROPIC_SETUP_TOKEN` > `ANTHROPIC_API_K
 
 ## Versioning Rules
 
-**`package.json`** — bump on every push that ships user-facing changes:
+**`package.json`** — PRE-1.0: stay in `0.x`, bump once per release, not per commit:
 - `patch` (0.x.Y): bug fixes, copy changes, test additions
-- `minor` (0.X.0): new commands, new templates, new flags, new skills
-- `major` (X.0.0): breaking CLI changes (removed commands, changed output format)
+- `minor` (0.X.0): new commands, flags, templates, skills — AND breaking changes (all pre-1.0)
+- `1.0.0`: a deliberate stability commitment (stable CLI) — never auto-bump there
 
 **`SKILL.md` frontmatter `version:`** — bump whenever the file is edited:
 - `patch`: content corrections, guardrail tweaks, wording changes
