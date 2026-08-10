@@ -22,7 +22,8 @@ scripts/
 .DS_Store
 **/.DS_Store
 
-# lavish skill scratch (internal planning artifacts, mm-cli is a public repo)
+# kaya / lavish review artifacts (local review surfaces, mm-cli is a public repo)
+.kaya/
 .lavish/
 
 # Cloudflare Wrangler local state
