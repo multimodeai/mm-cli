@@ -1,0 +1,85 @@
+name: lavish-watch
+
+# Biweekly clean-room parity tripwire. Watches lavish-axi's PUBLIC npm version
+# only (never its source) and opens an issue when Kun Chen ships something new,
+# so we can decide whether KAYA should match the BEHAVIOUR. Runs on the 1st and
+# 15th (~every two weeks); also runnable on demand from the Actions tab.
+
+on:
+  schedule:
+    - cron: '7 9 1,15 * *'   # 09:07 UTC, 1st and 15th of each month
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # to update the committed baseline
+  issues: write     # to open the parity-check issue
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Compare lavish-axi public version to baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CUR=$(npm view lavish-axi version)
+          BASE=$(tr -d '[:space:]' < .github/lavish-baseline.txt 2>/dev/null || echo none)
+          echo "lavish-axi current=$CUR  baseline=$BASE"
+
+          if [ "$CUR" = "$BASE" ]; then
+            echo "No new lavish-axi release since last check. Nothing to do."
+            exit 0
+          fi
+
+          # Public metadata only: recent versions + publish dates.
+          RECENT=$(npm view lavish-axi time --json | node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              const t=JSON.parse(s);
+              const ks=Object.keys(t).filter(k=>k!=="created"&&k!=="modified").slice(-8);
+              console.log(ks.map(k=>"- `"+k+"` — "+t[k].slice(0,10)).join("\n"));
+            });')
+          DESC=$(npm view lavish-axi description 2>/dev/null || echo "")
+
+          BODY=$(cat <<EOF
+          **lavish-axi moved \`$BASE\` → \`$CUR\`.** Time for a clean-room parity check.
+
+          Recent public releases (npm metadata only):
+          $RECENT
+
+          Package tagline: _${DESC}_
+
+          ## Clean-room rules (do NOT break)
+          - Read only PUBLIC surfaces: the npm changelog/README, the package's public GitHub repo, and the tool's observable behaviour when run.
+          - NEVER read or port \`node_modules/lavish-axi/dist\` or any of its source. Reimplement from behaviour only.
+
+          ## What to check
+          Compare against KAYA's current feature set — annotate popup, batched feedback, per-round conversation history, offline self-contained export, hand-drawn dark Mermaid, markdown-spec rendering, multi-tab awareness, overflow menu, favicon:
+          - [ ] Did lavish add a user-facing capability KAYA lacks and would want?
+          - [ ] Is it worth reimplementing (behaviour-only), or deliberately skip it?
+          - [ ] File a follow-up task for anything we choose to match.
+
+          _Opened automatically by \`.github/workflows/lavish-watch.yml\`. Baseline will advance to \`$CUR\`._
+          EOF
+          )
+
+          gh issue create \
+            --title "lavish-axi $BASE → $CUR — clean-room parity check" \
+            --body "$BODY" \
+            --label "parity" 2>/dev/null \
+          || gh issue create \
+            --title "lavish-axi $BASE → $CUR — clean-room parity check" \
+            --body "$BODY"
+
+          # Advance the baseline so the next run only reports newer releases.
+          echo "$CUR" > .github/lavish-baseline.txt
+          git config user.name "lavish-watch[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/lavish-baseline.txt
+          git commit -m "chore(lavish-watch): advance baseline to $CUR"
+          git push
