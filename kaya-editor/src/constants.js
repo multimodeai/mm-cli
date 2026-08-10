@@ -7,7 +7,7 @@ export const OVERLAY_STYLE = `
 #kaya-nav, #kaya-nav *, #kaya-convo, #kaya-convo *, #kaya-hl, #kaya-pop, #kaya-pop * { box-sizing:border-box; font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
 
 /* Navbar */
-#kaya-nav { position:fixed; top:0; left:0; right:0; height:52px; z-index:2147483644; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 18px 0 20px; background:#000; border-bottom:1px solid var(--line); box-shadow:0 2px 22px rgba(0,0,0,.5); color:var(--ink); }
+#kaya-nav { position:fixed; top:0; left:0; right:0; height:52px; z-index:2147483645; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 18px 0 20px; background:#000; border-bottom:1px solid var(--line); box-shadow:0 2px 22px rgba(0,0,0,.5); color:var(--ink); }
 #kaya-nav .kaya-brandwrap { display:flex; align-items:baseline; gap:9px; }
 #kaya-nav .kaya-brand { font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif; font-style:italic; font-weight:600; font-size:23px; line-height:1; color:var(--kt2); }
 #kaya-nav .kaya-brand-sub { font-size:10.5px; letter-spacing:.28em; font-weight:700; text-transform:uppercase; color:var(--muted); }
