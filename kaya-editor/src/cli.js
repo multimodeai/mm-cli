@@ -9,7 +9,7 @@ import { listRegistries, readRegistry } from './registry.js';
 const cliFile = fileURLToPath(import.meta.url);
 
 function usage() {
-  console.error('Usage: kaya <file> | kaya list | kaya poll <file> [--agent-reply <msg>] | kaya end <file> | kaya export <file> [--out <path>] | kaya stop');
+  console.error('Usage: kaya <file> | kaya list | kaya poll <file> [--agent-reply <msg>] | kaya end <file> | kaya export <file> [--out <path>] | kaya stop [file]');
 }
 
 function parseFlag(args, name) {
@@ -133,14 +133,20 @@ async function list() {
   });
 }
 
-async function stop() {
-  for (const registry of listRegistries()) {
+async function stop(file) {
+  // `kaya stop <file>` stops only that session; bare `kaya stop` stops all.
+  // Targeting matters: an untargeted stop would kill every open review at once.
+  const registries = file ? [readRegistry(resolve(file))].filter(Boolean) : listRegistries();
+  if (file && !registries.length) { console.log(`No active Kaya session for ${resolve(file)}`); return; }
+  let stopped = 0;
+  for (const registry of registries) {
     if (!registry.file) continue;
     try {
       const response = await fetch(`http://${registry.host || '127.0.0.1'}:${registry.port}/__kaya/stop`, { method: 'POST' });
-      if (response.ok) console.log(`Stopped Kaya for ${registry.file}`);
+      if (response.ok) { console.log(`Stopped Kaya for ${registry.file}`); stopped++; }
     } catch (_error) { /* stale registry will be replaced on the next open */ }
   }
+  if (!file && !stopped) console.log('No active Kaya sessions.');
 }
 
 export async function main(args) {
@@ -155,7 +161,7 @@ export async function main(args) {
     case 'poll': return poll(args[1], parseFlag(args.slice(2), '--agent-reply'));
     case 'end': return end(args[1]);
     case 'export': return console.log(`Exported ${await exportHtml(args[1], parseFlag(args.slice(2), '--out'))}`);
-    case 'stop': return stop();
+    case 'stop': return stop(args[1]);
     case 'list': return list();
     default: return open(args[0]);
   }
