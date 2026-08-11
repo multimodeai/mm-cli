@@ -68,8 +68,22 @@ async function open(file) {
 }
 
 async function poll(file, agentReply) {
-  const response = await requestTo(resolve(file), `/__kaya/poll${agentReply ? `?agent_reply=${encodeURIComponent(agentReply)}` : ''}`);
-  process.stdout.write(await response.text());
+  const target = resolve(file);
+  let replySent = false;
+  // Block until there is real feedback or the session ends, looping over the
+  // server's bounded keep-alives so no single request outlives the fetch header
+  // timeout. This keeps the agent listening the whole time (like a blocking
+  // poll) instead of returning an empty keep-alive that makes it stop watching
+  // and miss feedback sent moments later.
+  for (;;) {
+    const qs = !replySent && agentReply ? `?agent_reply=${encodeURIComponent(agentReply)}` : '';
+    const response = await requestTo(target, `/__kaya/poll${qs}`);
+    const text = await response.text();
+    replySent = true;
+    const feedback = text.replace(/session_ended:[\s\S]*$/, '').trim();
+    const ended = /session_ended:\s*true/.test(text);
+    if (feedback || ended) { process.stdout.write(text); return; }
+  }
 }
 
 async function end(file) {
