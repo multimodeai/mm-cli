@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { injectOverlay, injectBaseTheme } from './overlay.js';
 import { injectFavicon } from './favicon.js';
-import { removeRegistry, writeRegistry } from './registry.js';
+import { removeRegistry, writeRegistry, readHistory, writeHistory } from './registry.js';
 import { injectMermaidRuntime, mermaidRuntime } from './mermaid.js';
 import { markdownDocument } from './markdown.js';
 import { inlineAssets } from './export.js';
@@ -51,8 +51,12 @@ export class KayaReviewServer {
     this.ended = false;
     this.clients = new Map();
     this.primary = null;
-    this.history = [];
+    // Restore prior conversation from disk so reopening (or restarting) a file
+    // keeps every round and annotation instead of starting blank.
+    this.history = readHistory(this.file);
   }
+
+  persistHistory() { writeHistory(this.file, this.history); }
 
   start() {
     if (this.server) return Promise.resolve(this);
@@ -92,6 +96,7 @@ export class KayaReviewServer {
   poll(agentReply) {
     if (typeof agentReply === 'string' && agentReply && agentReply !== this.agentReply) {
       this.history.push({ role: 'agent', text: agentReply });
+      this.persistHistory();
     }
     if (typeof agentReply === 'string') this.agentReply = agentReply;
     if (this.queue.length || this.ended) return Promise.resolve({ feedback: this.queue.splice(0), ended: this.ended });
@@ -155,6 +160,7 @@ export class KayaReviewServer {
         item.rawText = `[${item.tag}]${item.selector ? ` ${item.selector}` : ''}${item.selectedText ? `\nSelected: ${item.selectedText}` : ''}\n${item.text}`;
         this.queue.push(item);
         this.history.push({ role: 'you', text: item.text, ref: data.ref || item.selectedText || null });
+        this.persistHistory();
         this.notify();
         return json(response, 202, { queued: true });
       } catch (error) { return json(response, 400, { error: error instanceof Error ? error.message : 'invalid JSON' }); }
@@ -163,6 +169,10 @@ export class KayaReviewServer {
       this.ended = true;
       this.notify();
       return json(response, 200, { ended: true });
+    }
+    if (url.pathname === '/__kaya/reopen' && request.method === 'POST') {
+      this.ended = false;
+      return json(response, 200, { reopened: true, ended: false });
     }
     if (url.pathname === '/__kaya/stop' && request.method === 'POST') {
       json(response, 200, { stopped: true });

@@ -55,8 +55,17 @@ async function open(file) {
   if (!existsSync(target)) throw new Error(`artifact not found: ${target}`);
   const existing = readRegistry(target);
   if (existing) {
-    try { await requestTo(target, '/__kaya/health', { timeoutMs: 500 }); }
-    catch (_error) { /* stale registry is replaced by the new server */ }
+    try {
+      await requestTo(target, '/__kaya/health', { timeoutMs: 500 });
+      // A live server for this file already exists. Reuse it so the URL and the
+      // full conversation history are preserved, and clear any ended state so
+      // review can continue. Reopening must never spawn a second server / URL.
+      await requestTo(target, '/__kaya/reopen', { method: 'POST', timeoutMs: 500 }).catch(() => {});
+      const reuseUrl = `http://${existing.host || '127.0.0.1'}:${existing.port}/`;
+      console.log(`Kaya already serving ${target} at ${reuseUrl}`);
+      try { openBrowser(reuseUrl); } catch (_error) { console.log(`Open this URL in a browser: ${reuseUrl}`); }
+      return;
+    } catch (_error) { /* stale/dead registry: fall through and spawn a fresh server */ }
   }
   const child = spawn(process.execPath, [cliFile, '--server', target], { detached: true, stdio: 'ignore', cwd: dirname(target) });
   child.unref();

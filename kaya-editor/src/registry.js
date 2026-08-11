@@ -16,6 +16,19 @@ function keyFor(file) {
 
 export function registryPath(file) { return join(registryDirectory(), `${keyFor(file)}.json`); }
 
+export function historyPath(file) { return join(registryDirectory(), `${keyFor(file)}.history.json`); }
+
+export function readHistory(file) {
+  const path = historyPath(file);
+  if (!existsSync(path)) return [];
+  try { const value = JSON.parse(readFileSync(path, 'utf8')); return Array.isArray(value) ? value : []; }
+  catch (_error) { return []; }
+}
+
+export function writeHistory(file, history) {
+  try { writeFileSync(historyPath(file), JSON.stringify(history)); } catch (_error) { /* best-effort persistence */ }
+}
+
 export function writeRegistry(file, value) {
   writeFileSync(registryPath(file), JSON.stringify({ file: resolve(file), ...value }, null, 2));
 }
