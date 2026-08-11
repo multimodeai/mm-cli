@@ -1,6 +1,6 @@
 {
   "name": "mm-kit",
-  "version": "0.1.54",
+  "version": "0.1.55",
   "description": "Developer tool that operationalizes the 4 disciplines of AI input with measurable eval outcomes",
   "type": "module",
   "bin": {
@@ -23,7 +23,7 @@
   ],
   "license": "FSL-1.1-MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
