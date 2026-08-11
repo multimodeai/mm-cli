@@ -5,16 +5,7 @@ A CLI that turns AI prompting from guesswork into engineering. Define what you w
 ## Install
 
 ```bash
-npm i -g mm-kit   # installs both `mm` and `kaya` globally
-```
-
-Or from source:
-
-```bash
-git clone https://github.com/multimodeai/mm-cli.git
-cd mm-cli
-npm install && npm run build
-npm link          # installs `mm` and `kaya` globally
+npm i -g mm-kit   # the one install: provides both `mm` and `kaya`
 ```
 
 Requires Node.js 22+ and a Claude API key or OAuth token:
@@ -24,6 +15,8 @@ export ANTHROPIC_API_KEY=sk-ant-api-...
 # or
 export CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat-...
 ```
+
+> Contributing to mm itself? Clone this repo, then `npm install && npm run build && npm link` for a live-editable global build. That's the development workflow, not a second way to install: end users only ever run `npm i -g mm-kit`.
 
 ## The Flow
 
