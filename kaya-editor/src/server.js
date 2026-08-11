@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
-import { injectOverlay, injectBaseTheme } from './overlay.js';
+import { injectOverlay, injectBaseTheme, injectTitle } from './overlay.js';
 import { injectFavicon } from './favicon.js';
 import { removeRegistry, writeRegistry, readHistory, writeHistory, listRegistries } from './registry.js';
 import { injectMermaidRuntime, mermaidRuntime } from './mermaid.js';
@@ -211,7 +211,7 @@ export class KayaReviewServer {
     const type = MIME_TYPES[extname(requested).toLowerCase()] || 'application/octet-stream';
     response.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
     response.end(requested === this.file && /\.html?$/i.test(requested)
-      ? injectFavicon(injectMermaidRuntime(injectOverlay(injectBaseTheme(content.toString('utf8')))))
+      ? injectFavicon(injectTitle(injectMermaidRuntime(injectOverlay(injectBaseTheme(content.toString('utf8')))), basename(this.file)))
       : content);
   }
 }

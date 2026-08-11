@@ -276,3 +276,14 @@ export function injectBaseTheme(html) {
   if (/<html[^>]*>/i.test(html)) return html.replace(/<html([^>]*)>/i, `<html$1>${style}`);
   return `${style}${html}`;
 }
+
+// Give the browser tab a meaningful name (the file being reviewed) so multiple
+// open sessions are easy to tell apart, instead of "127.0.0.1". Only fills in a
+// title when the artifact does not already declare its own.
+export function injectTitle(html, name) {
+  if (/<title[^>]*>[\s\S]*?<\/title>/i.test(html)) return html;
+  const tag = `<title>${String(name || 'Kaya review').replace(/[<>&]/g, '')}</title>`;
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head([^>]*)>/i, `<head$1>${tag}`);
+  if (/<html[^>]*>/i.test(html)) return html.replace(/<html([^>]*)>/i, `<html$1><head>${tag}</head>`);
+  return `<head>${tag}</head>${html}`;
+}
