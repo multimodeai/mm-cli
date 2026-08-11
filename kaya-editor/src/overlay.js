@@ -15,6 +15,7 @@ export const OVERLAY_SCRIPT = `
   nav.innerHTML = '<div class="kaya-brandwrap"><span class="kaya-brand">Kaya</span><span class="kaya-brand-sub">Editor</span></div>'
     + '<div class="kaya-nav-right">'
     + '<label class="kaya-toggle"><input type="checkbox" data-kaya-annotate><span class="kaya-switch"></span>Annotate</label>'
+    + '<div class="kaya-reviewswrap" data-reviews-wrap style="display:none"><button class="kaya-reviewsbtn" data-reviews-btn>Reviews</button><div class="kaya-reviews" data-reviews></div></div>'
     + '<div class="kaya-menuwrap"><button class="kaya-menubtn" data-menu-btn aria-label="Menu">\\u22ee</button>'
     + '<div class="kaya-menu" data-menu>'
     + '<div class="kaya-menu-file" data-menu-file>artifact</div>'
@@ -205,7 +206,34 @@ export const OVERLAY_SCRIPT = `
   nav.querySelector('[data-menu-reload]').addEventListener('click', function(){ closeMenu(); window.location.reload(); });
   nav.querySelector('[data-menu-copy]').addEventListener('click', function(){ closeMenu(); if(navigator.clipboard && filePath) navigator.clipboard.writeText(filePath); });
   nav.querySelector('[data-menu-export]').addEventListener('click', function(){ closeMenu(); const a=document.createElement('a'); a.href=base+'/export'; a.download=''; document.body.appendChild(a); a.click(); a.remove(); });
-  nav.querySelector('[data-menu-end]').addEventListener('click', async function(){ closeMenu(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; refresh(); }catch(_e){} });
+  nav.querySelector('[data-menu-end]').addEventListener('click', async function(){ closeMenu(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; applyEnded(); refresh(); }catch(_e){} });
+
+  // ---- reviews switcher: shows every open Kaya session so you can see what is
+  // latest and jump between them (server aggregates them, no cross-port CORS) ----
+  const reviewsWrap = nav.querySelector('[data-reviews-wrap]');
+  const reviewsBtn = nav.querySelector('[data-reviews-btn]');
+  const reviewsEl = nav.querySelector('[data-reviews]');
+  function relTimeUI(ms){ const s=Math.round(ms/1000); if(s<10)return'just now'; if(s<60)return s+'s ago'; const m=Math.round(s/60); if(m<60)return m+'m ago'; return Math.round(m/60)+'h ago'; }
+  async function refreshReviews(){
+    try{
+      const r=await fetch(base+'/sessions'); if(!r.ok) return; const d=await r.json();
+      const sessions=(d.sessions)||[];
+      if(sessions.length<=1){ reviewsWrap.style.display='none'; reviewsEl.classList.remove('kaya-open'); return; }
+      reviewsWrap.style.display='inline-flex';
+      reviewsBtn.textContent='Reviews ('+sessions.length+')';
+      const now=Date.now();
+      reviewsEl.innerHTML=sessions.map(function(s){
+        const cur=s.self?' kaya-rev-current':'';
+        const tags=(s.self?'<span class="kaya-rev-you">this tab</span>':'')+(s.ended?'<span class="kaya-rev-ended">ended</span>':'');
+        const meta=s.historyLen+' msg'+(s.historyLen===1?'':'s')+' \\u00b7 '+relTimeUI(now-(s.lastActivity||now));
+        return '<button class="kaya-rev-item'+cur+'" data-rev-url="'+esc(s.url)+'"><span class="kaya-rev-name">'+esc(s.name)+tags+'</span><span class="kaya-rev-meta">'+esc(meta)+'</span></button>';
+      }).join('');
+    }catch(_e){}
+  }
+  reviewsBtn.addEventListener('click', function(){ reviewsEl.classList.toggle('kaya-open'); refreshReviews(); });
+  reviewsEl.addEventListener('click', function(e){ const b=e.target.closest && e.target.closest('[data-rev-url]'); if(!b) return; reviewsEl.classList.remove('kaya-open'); if(b.classList.contains('kaya-rev-current')) return; const u=b.getAttribute('data-rev-url'); if(u) window.open(u, u); });
+  document.addEventListener('mousedown', function(e){ if(reviewsWrap && !reviewsWrap.contains(e.target)) reviewsEl.classList.remove('kaya-open'); }, true);
+  refreshReviews(); window.setInterval(refreshReviews, 4000);
 
   // ---- multi-tab awareness ----
   const bannerEl = q('[data-otherbanner]');

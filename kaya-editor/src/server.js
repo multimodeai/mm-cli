@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { injectOverlay, injectBaseTheme } from './overlay.js';
 import { injectFavicon } from './favicon.js';
-import { removeRegistry, writeRegistry, readHistory, writeHistory } from './registry.js';
+import { removeRegistry, writeRegistry, readHistory, writeHistory, listRegistries } from './registry.js';
 import { injectMermaidRuntime, mermaidRuntime } from './mermaid.js';
 import { markdownDocument } from './markdown.js';
 import { inlineAssets } from './export.js';
@@ -54,9 +54,11 @@ export class KayaReviewServer {
     // Restore prior conversation from disk so reopening (or restarting) a file
     // keeps every round and annotation instead of starting blank.
     this.history = readHistory(this.file);
+    this.lastActivity = Date.now();
   }
 
   persistHistory() { writeHistory(this.file, this.history); }
+  touch() { this.lastActivity = Date.now(); }
 
   start() {
     if (this.server) return Promise.resolve(this);
@@ -97,6 +99,7 @@ export class KayaReviewServer {
     if (typeof agentReply === 'string' && agentReply && agentReply !== this.agentReply) {
       this.history.push({ role: 'agent', text: agentReply });
       this.persistHistory();
+      this.touch();
     }
     if (typeof agentReply === 'string') this.agentReply = agentReply;
     if (this.queue.length || this.ended) return Promise.resolve({ feedback: this.queue.splice(0), ended: this.ended });
@@ -114,7 +117,22 @@ export class KayaReviewServer {
 
   async handle(request, response) {
     const url = new URL(request.url || '/', this.address());
-    if (url.pathname === '/__kaya/health') return json(response, 200, { ok: true, file: this.file });
+    if (url.pathname === '/__kaya/health') return json(response, 200, { ok: true, file: this.file, ended: this.ended, historyLen: this.history.length, lastActivity: this.lastActivity });
+    if (url.pathname === '/__kaya/sessions' && request.method === 'GET') {
+      const regs = listRegistries();
+      const results = await Promise.all(regs.map(async (r) => {
+        if (!r.file || !r.port) return undefined;
+        const origin = `http://${r.host || '127.0.0.1'}:${r.port}`;
+        try {
+          const resp = await fetch(`${origin}/__kaya/health`, { signal: AbortSignal.timeout(500) });
+          if (!resp.ok) return undefined;
+          const info = await resp.json();
+          return { file: r.file, name: basename(r.file), url: `${origin}/`, port: r.port, self: r.port === this.port, ended: Boolean(info.ended), historyLen: info.historyLen || 0, lastActivity: info.lastActivity || 0 };
+        } catch (_error) { return undefined; }
+      }));
+      const sessions = results.filter(Boolean).sort((a, b) => b.lastActivity - a.lastActivity);
+      return json(response, 200, { sessions });
+    }
     if (url.pathname === '/__kaya/mermaid-runtime.js') {
       response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
       return response.end(mermaidRuntime());
@@ -161,6 +179,7 @@ export class KayaReviewServer {
         this.queue.push(item);
         this.history.push({ role: 'you', text: item.text, ref: data.ref || item.selectedText || null });
         this.persistHistory();
+        this.touch();
         this.notify();
         return json(response, 202, { queued: true });
       } catch (error) { return json(response, 400, { error: error instanceof Error ? error.message : 'invalid JSON' }); }

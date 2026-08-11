@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { exportHtml } from './export.js';
 import { startKayaServer } from './server.js';
@@ -9,7 +9,7 @@ import { listRegistries, readRegistry } from './registry.js';
 const cliFile = fileURLToPath(import.meta.url);
 
 function usage() {
-  console.error('Usage: kaya <file> | kaya poll <file> [--agent-reply <msg>] | kaya end <file> | kaya export <file> [--out <path>] | kaya stop');
+  console.error('Usage: kaya <file> | kaya list | kaya poll <file> [--agent-reply <msg>] | kaya end <file> | kaya export <file> [--out <path>] | kaya stop');
 }
 
 function parseFlag(args, name) {
@@ -100,6 +100,39 @@ async function end(file) {
   console.log(await response.text());
 }
 
+function relTime(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 10) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.round(m / 60)}h ago`;
+}
+
+async function list() {
+  const rows = [];
+  for (const r of listRegistries()) {
+    if (!r.file || !r.port) continue;
+    const origin = `http://${r.host || '127.0.0.1'}:${r.port}`;
+    try {
+      const resp = await fetch(`${origin}/__kaya/health`, { signal: AbortSignal.timeout(600) });
+      if (!resp.ok) continue;
+      const info = await resp.json();
+      rows.push({ name: basename(r.file), url: `${origin}/`, ended: Boolean(info.ended), historyLen: info.historyLen || 0, lastActivity: info.lastActivity || 0 });
+    } catch (_error) { /* dead session, skip */ }
+  }
+  rows.sort((a, b) => b.lastActivity - a.lastActivity);
+  if (!rows.length) { console.log('No active Kaya sessions.'); return; }
+  const now = Date.now();
+  console.log(`${rows.length} active Kaya session${rows.length > 1 ? 's' : ''} (newest first):\n`);
+  rows.forEach((row, index) => {
+    const marker = index === 0 ? '→' : ' ';
+    const status = row.ended ? ' [ended]' : '';
+    console.log(`${marker} ${row.name}${status}`);
+    console.log(`   ${row.url}  ${row.historyLen} msg${row.historyLen === 1 ? '' : 's'}  active ${relTime(now - row.lastActivity)}`);
+  });
+}
+
 async function stop() {
   for (const registry of listRegistries()) {
     if (!registry.file) continue;
@@ -123,6 +156,7 @@ export async function main(args) {
     case 'end': return end(args[1]);
     case 'export': return console.log(`Exported ${await exportHtml(args[1], parseFlag(args.slice(2), '--out'))}`);
     case 'stop': return stop();
+    case 'list': return list();
     default: return open(args[0]);
   }
 }

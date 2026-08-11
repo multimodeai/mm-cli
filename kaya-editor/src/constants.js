@@ -85,6 +85,18 @@ html.kaya-annotate { cursor:crosshair; }
 #kaya-nav .kaya-menu-item:hover { background:rgba(255,255,255,.07); }
 #kaya-nav .kaya-menu-danger { color:#e5766a; }
 #kaya-nav .kaya-menu-danger:hover { background:rgba(229,118,106,.14); }
+#kaya-nav .kaya-reviewswrap { position:relative; }
+#kaya-nav .kaya-reviewsbtn { display:inline-flex; align-items:center; height:34px; padding:0 12px; border:1px solid var(--line); border-radius:9px; background:transparent; color:var(--muted); font-size:12.5px; font-weight:600; cursor:pointer; }
+#kaya-nav .kaya-reviewsbtn:hover { background:rgba(255,255,255,.06); color:var(--ink); }
+#kaya-nav .kaya-reviews { position:absolute; top:calc(100% + 6px); right:0; min-width:288px; max-width:360px; max-height:60vh; overflow-y:auto; display:none; flex-direction:column; gap:2px; padding:6px; background:var(--bg); border:1px solid var(--line); border-radius:11px; box-shadow:0 16px 40px rgba(0,0,0,.55); }
+#kaya-nav .kaya-reviews.kaya-open { display:flex; }
+#kaya-nav .kaya-rev-item { display:flex; flex-direction:column; gap:2px; align-items:flex-start; text-align:left; width:100%; padding:8px 10px; border:0; border-radius:8px; background:transparent; color:var(--ink); cursor:pointer; }
+#kaya-nav .kaya-rev-item:hover { background:rgba(255,255,255,.07); }
+#kaya-nav .kaya-rev-current { background:rgba(199,91,63,.14); cursor:default; }
+#kaya-nav .kaya-rev-name { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:600; }
+#kaya-nav .kaya-rev-you { color:var(--kt2); font-weight:700; font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; margin-left:7px; }
+#kaya-nav .kaya-rev-ended { color:var(--muted); font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; margin-left:7px; }
+#kaya-nav .kaya-rev-meta { font-size:11px; color:var(--muted); }
 #kaya-convo .kaya-msg .kaya-who .kaya-round { margin-left:7px; padding:1px 7px; border-radius:999px; background:rgba(199,91,63,.18); color:var(--kt2); font-size:9px; letter-spacing:.06em; }
 #kaya-convo .kaya-otherbanner { display:none; align-items:center; justify-content:space-between; gap:10px; margin:0 14px 10px; padding:9px 12px; border:1px solid rgba(224,176,98,.4); border-radius:9px; background:rgba(224,176,98,.1); color:#e0b062; font-size:12px; line-height:1.35; }
 #kaya-convo .kaya-otherbanner.kaya-show { display:flex; }
