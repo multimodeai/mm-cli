@@ -48,7 +48,8 @@ html.kaya-annotate { cursor:crosshair; }
 #kaya-convo .kaya-log { flex:1 1 0; min-height:0; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:11px; }
 #kaya-convo .kaya-msg { padding:10px 12px; border-radius:11px; font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
 #kaya-convo .kaya-msg .kaya-who { display:block; font-size:9.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; margin-bottom:5px; opacity:.85; }
-#kaya-convo .kaya-msg .kaya-ref { display:block; margin-bottom:6px; padding:5px 8px; border-radius:7px; background:rgba(199,91,63,.14); border-left:2px solid var(--kt); font-size:11.5px; color:var(--kt2); font-style:italic; overflow-wrap:anywhere; }
+#kaya-convo .kaya-msg .kaya-ref { display:block; margin-bottom:6px; padding:5px 8px; border-radius:7px; background:rgba(199,91,63,.14); border-left:2px solid var(--kt); font-size:11.5px; color:var(--kt2); font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#kaya-convo .kaya-msg.you:hover .kaya-ref { white-space:normal; overflow:visible; overflow-wrap:anywhere; }
 #kaya-convo .kaya-msg.agent { background:var(--bg2); }
 #kaya-convo .kaya-msg.agent .kaya-who { color:var(--kt2); }
 #kaya-convo .kaya-msg.you { background:var(--bg3); }

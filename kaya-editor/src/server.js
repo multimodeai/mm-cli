@@ -59,6 +59,7 @@ export class KayaReviewServer {
 
   persistHistory() { writeHistory(this.file, this.history); }
   touch() { this.lastActivity = Date.now(); }
+  fileMtime() { try { return statSync(this.file).mtimeMs; } catch (_error) { return 0; } }
 
   start() {
     if (this.server) return Promise.resolve(this);
@@ -156,7 +157,7 @@ export class KayaReviewServer {
       if (cid) this.clients.set(cid, now);
       for (const [id, t] of this.clients) if (now - t > 6000) this.clients.delete(id);
       if (!this.primary || !this.clients.has(this.primary)) this.primary = this.clients.keys().next().value || null;
-      return json(response, 200, { agentReply: this.agentReply, ended: this.ended, queued: this.queue.length, clients: this.clients.size, primary: this.primary, history: this.history });
+      return json(response, 200, { agentReply: this.agentReply, ended: this.ended, queued: this.queue.length, clients: this.clients.size, primary: this.primary, history: this.history, fileMtime: this.fileMtime() });
     }
     if (url.pathname === '/__kaya/claim' && request.method === 'POST') {
       const cid = url.searchParams.get('client');

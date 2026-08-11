@@ -178,6 +178,7 @@ export const OVERLAY_SCRIPT = `
       try{ await fetch(base+'/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({ text: it.agentText, tag:'comment', selector: it.selector, selectedText: it.selectedText, ref: it.ref||null })}); }
       catch(_e){ state.queued.unshift(it); renderPending(); return; }
     }
+    if(state.needsReload){ state.needsReload=false; location.reload(); return; }
     refresh();
   }
   const sendBtn=q('[data-send]'); const endBtn=q('[data-end]');
@@ -251,6 +252,17 @@ export const OVERLAY_SCRIPT = `
       renderHistory(d.history||[]);
       state.ended=Boolean(d.ended); applyEnded();
       bannerEl.classList.toggle('kaya-show', (d.clients||1) > 1 && !!d.primary && d.primary!==clientId);
+      // The agent rewrote the artifact on disk -> reload so the body reflects it
+      // (the conversation persists on the server). Only when nothing is staged,
+      // so we never drop unsent annotations; otherwise reload after the next send.
+      if(d.fileMtime){
+        if(state.fileMtime==null){ state.fileMtime=d.fileMtime; }
+        else if(d.fileMtime!==state.fileMtime){
+          state.fileMtime=d.fileMtime;
+          if(!state.queued.length){ location.reload(); return; }
+          state.needsReload=true;
+        }
+      }
     } catch(_e){}
   }
   refresh(); window.setInterval(refresh, 1200);
