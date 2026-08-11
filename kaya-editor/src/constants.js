@@ -72,6 +72,8 @@ html.kaya-annotate { cursor:crosshair; }
 #kaya-convo .kaya-btn-primary:hover { background:#b34e35; }
 #kaya-convo .kaya-btn-ghost { height:39px; padding:0 14px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--muted); font-size:12.5px; font-weight:600; cursor:pointer; }
 #kaya-convo .kaya-btn-ghost:hover { background:rgba(255,255,255,.05); color:var(--ink); }
+#kaya-convo .kaya-composer textarea:disabled { opacity:.5; cursor:not-allowed; }
+#kaya-convo.kaya-ended .kaya-btn-primary, #kaya-convo.kaya-ended .kaya-btn-ghost { opacity:.4; pointer-events:none; }
 #kaya-nav .kaya-nav-right { display:flex; align-items:center; gap:6px; }
 #kaya-nav .kaya-menuwrap { position:relative; }
 #kaya-nav .kaya-menubtn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border:0; border-radius:9px; background:transparent; color:var(--muted); font-size:22px; line-height:1; cursor:pointer; }

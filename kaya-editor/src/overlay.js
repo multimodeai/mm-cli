@@ -179,8 +179,18 @@ export const OVERLAY_SCRIPT = `
     }
     refresh();
   }
-  q('[data-send]').addEventListener('click', function(){ send(); });
-  q('[data-end]').addEventListener('click', async function(){ await send(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; refresh(); }catch(_e){} });
+  const sendBtn=q('[data-send]'); const endBtn=q('[data-end]');
+  // Once the review is ended (Send & End, or ended elsewhere) the agent stops
+  // polling, so anything typed here would queue with nobody listening. Reflect
+  // that: disable the composer and say how to continue.
+  function applyEnded(){
+    const e=state.ended;
+    composerInput.disabled=e; sendBtn.disabled=e; endBtn.disabled=e;
+    composerInput.placeholder = e ? 'Review ended - run kaya again to reopen and continue.' : 'Write a message for the agent...';
+    convo.classList.toggle('kaya-ended', e);
+  }
+  sendBtn.addEventListener('click', function(){ send(); });
+  endBtn.addEventListener('click', async function(){ await send(); try{ await fetch(base+'/end',{method:'POST'}); state.ended=true; applyEnded(); refresh(); }catch(_e){} });
   composerInput.addEventListener('keydown', function(e){ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); send(); } });
 
   // ---- navbar overflow menu ----
@@ -211,7 +221,7 @@ export const OVERLAY_SCRIPT = `
   async function refresh(){
     try{ const r=await fetch(base+'/state?client='+clientId); if(!r.ok) return; const d=await r.json();
       renderHistory(d.history||[]);
-      state.ended=Boolean(d.ended);
+      state.ended=Boolean(d.ended); applyEnded();
       bannerEl.classList.toggle('kaya-show', (d.clients||1) > 1 && !!d.primary && d.primary!==clientId);
     } catch(_e){}
   }
