@@ -62,8 +62,10 @@ async function open(file) {
       // review can continue. Reopening must never spawn a second server / URL.
       await requestTo(target, '/__kaya/reopen', { method: 'POST', timeoutMs: 500 }).catch(() => {});
       const reuseUrl = `http://${existing.host || '127.0.0.1'}:${existing.port}/`;
-      console.log(`Kaya already serving ${target} at ${reuseUrl}`);
-      try { openBrowser(reuseUrl); } catch (_error) { console.log(`Open this URL in a browser: ${reuseUrl}`); }
+      // Do NOT open the browser again: the tab is already up and live-reloads on
+      // changes, so spawning one per revision round is what produced a new window
+      // each time. Just report the URL in case the tab was closed.
+      console.log(`Kaya already serving ${target} at ${reuseUrl} (reused; the open tab live-reloads - open the URL only if you closed it)`);
       return;
     } catch (_error) { /* stale/dead registry: fall through and spawn a fresh server */ }
   }
